@@ -49,6 +49,7 @@ namespace Peon
         private TargetManager?          _targeting;
         private RetainerManager?        _retainers;
         private LoginManager?           _login;
+        private ChocoboManager?         _chocobos;
 
 
         public void SetupServices(DalamudPluginInterface pluginInterface)
@@ -74,10 +75,11 @@ namespace Peon
             _interfaceManager = new InterfaceManager(pluginInterface);
             _addons           = new AddonWatcher(pluginInterface);
             _inputManager     = new InputManager();
-            _targeting        = new TargetManager(pluginInterface, _inputManager);
+            _targeting        = new TargetManager(pluginInterface, _inputManager, _addons);
             _ohBother         = new BotherHelper(_pluginInterface, _addons, _configuration);
-            _retainers        = new RetainerManager(_addons!, _ohBother, _interfaceManager!);
+            _retainers        = new RetainerManager(_pluginInterface, _targeting, _addons!, _ohBother, _interfaceManager!);
             _login            = new LoginManager(_pluginInterface, _ohBother, _interfaceManager!, _inputManager!);
+            _chocobos         = new ChocoboManager(_pluginInterface, _targeting, _addons, _ohBother, _interfaceManager);
 
             _pluginInterface.SavePluginConfig(_configuration);
 
@@ -109,6 +111,9 @@ namespace Peon
                 return;
             switch (argumentParts[0])
             {
+                case "cancel":
+                    _retainers!.Cancel();
+                    break;
                 case "turnin":
                     Task.Run(() =>
                     {
@@ -168,10 +173,10 @@ namespace Peon
                 case "interact":
                     if (argumentParts.Length < 2)
                         return;
-                    _targeting!.Interact(argumentParts[1]);
+                    _targeting!.Interact(argumentParts[1], 300);
                     break;
                 case "timeout":
-                    _addons?.AddTimedOneTimeDelegate(AddonEvent.SelectYesNoSetup, 
+                    _addons?.AddOneTime(AddonEvent.SelectYesNoSetup, 
                         (ptrx, data) => PluginLog.Information($"{ptrx}"), 300, 
                         () => PluginLog.Information("timeout"));
                     break;
@@ -312,13 +317,7 @@ namespace Peon
 
                     break;
                 case "chocobo":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("HousingChocoboList", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrHousingChocoboList s = ptr;
-                        s.Select(1);
-                    }
-
+                    _chocobos.FeedAllChocobos();
                     break;
                 case "bank":
                     var bank = _interfaceManager.Bank();

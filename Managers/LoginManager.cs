@@ -70,8 +70,8 @@ namespace Peon.Managers
 
         private IntPtr LogOut(IntPtr systemMenu)
         {
-            PtrSelectString list = systemMenu;
-            _botherHelper.SelectNextYesNo = true;
+            using var       nextYesno = _botherHelper.SelectNextYesNo(true);
+            PtrSelectString list      = systemMenu;
             if (!list.Select(new CompareString("Log Out", MatchType.Equal)))
                 return IntPtr.Zero;
 

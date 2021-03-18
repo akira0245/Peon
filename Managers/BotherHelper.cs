@@ -19,8 +19,34 @@ namespace Peon.Managers
 
         private readonly List<BotherSet> _bothersTalk;
         private readonly HashSet<string> _autoSkipSpeakerList = new();
-        public           bool            SkipNextTalk    { get; set; } = false;
-        public           bool?           SelectNextYesNo { get; set; } = null;
+        internal         bool            _skipNextTalk         = false;
+        internal         bool?           _selectNextYesNo      = null;
+
+        public BotherSetter SkipNextTalk()
+            => new(true, _selectNextYesNo, this);
+
+        public BotherSetter SelectNextYesNo(bool which)
+            => new(_skipNextTalk, which, this);
+
+        public readonly struct BotherSetter : IDisposable
+        {
+            private readonly BotherHelper _bother;
+            private readonly bool         _skipNextTalkOld;
+            private readonly bool?        _selectNextYesNoOld;
+
+            internal BotherSetter(bool skipNextTalk, bool? selectNextYesNo, BotherHelper bother)
+            {
+                _bother             = bother;
+                _skipNextTalkOld    = bother._skipNextTalk;
+                _selectNextYesNoOld = bother._selectNextYesNo;
+            }
+
+            public void Dispose()
+            {
+                _bother._skipNextTalk    = _skipNextTalkOld;
+                _bother._selectNextYesNo = _selectNextYesNoOld;
+            }
+        }
 
         public BotherHelper(DalamudPluginInterface pluginInterface, AddonWatcher addons, PeonConfiguration configuration)
         {
@@ -74,7 +100,7 @@ namespace Peon.Managers
 
             foreach (var set in _bothersTalk)
             {
-                var click = SkipNextTalk
+                var click = _skipNextTalk
                  || set.StringType switch
                     {
                         BotherSet.Source.Main    => set.Matches(text),
@@ -93,7 +119,7 @@ namespace Peon.Managers
                 if (!click)
                     continue;
 
-                SkipNextTalk                             =  false;
+                _skipNextTalk                             =  false;
                 _pluginInterface.Framework.OnUpdateEvent += TmpDelegate;
                 PluginLog.Verbose("Clicked Talk window due to match on {StringType}, {MatchType}: \"{Text}\".", set.StringType, set.MatchType,
                     set.Text);
@@ -105,13 +131,13 @@ namespace Peon.Managers
         {
             PtrSelectYesno selectPtr = ptr;
 
-            if (SelectNextYesNo != null)
+            if (_selectNextYesNo != null)
             {
-                selectPtr.Click(SelectNextYesNo.Value);
+                selectPtr.Click(_selectNextYesNo.Value);
                 return;
             }
 
-            SelectNextYesNo = null;
+            _selectNextYesNo = null;
             var stringPtr = *(void**) ((byte*) updateData.ToPointer() + 0x8);
             var text      = Marshal.PtrToStringAnsi(new IntPtr(stringPtr));
 

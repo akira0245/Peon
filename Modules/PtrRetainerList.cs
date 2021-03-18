@@ -18,8 +18,27 @@ namespace Peon.Modules
         private AtkComponentNode* ListNode
             => *(AtkComponentNode**) ((byte*) Pointer + ListOffset);
 
+
         public int Count
             => ((AtkComponentList*) ListNode->Component)->ListLength;
+
+        public RetainerData Info(int idx)
+        {
+            var list = (AtkComponentList*) ListNode->Component;
+            if (idx >= 0 && idx < list->ListLength)
+                return new RetainerData(idx, list->ItemRendererList[idx].AtkComponentListItemRenderer);
+
+            throw new ArgumentOutOfRangeException();
+        }
+
+        public RetainerData[] Info()
+        {
+            var list = (AtkComponentList*) ListNode->Component;
+            var ret  = new RetainerData[list->ListLength];
+            for (var i = 0; i < list->ListLength; ++i)
+                ret[i] = new RetainerData(i, list->ItemRendererList[i].AtkComponentListItemRenderer);
+            return ret;
+        }
 
         public bool Select(int idx)
             => Module.ClickList(Pointer, ListNode, idx, 1);

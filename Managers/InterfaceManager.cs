@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Dalamud.Plugin;
@@ -10,35 +9,23 @@ using Peon.Utility;
 
 namespace Peon.Managers
 {
-    public class InterfaceManager : IDisposable
+    public struct ModuleInfo
     {
-        private readonly struct ModuleWait
-        {
-            public ModuleWait(string m, bool r, int t, ulong a, TaskCompletionSource<IntPtr> x)
-            {
-                ModuleName      = m;
-                RequiresVisible = r;
-                TimeOut         = (ulong) t + a;
-                Task            = x;
-            }
+        public string Name;
+        public bool   RequiresVisible;
+        public bool   Inverted;
+    }
 
-            public readonly string                       ModuleName;
-            public readonly ulong                        TimeOut;
-            public readonly TaskCompletionSource<IntPtr> Task;
-            public readonly bool                         RequiresVisible;
-        }
-
-        private          ulong                      _currentTime;
-        private readonly DalamudPluginInterface     _pi;
-        private readonly LinkedList<ModuleWait>     _waitList = new();
+    public sealed class InterfaceManager : TimeOutList<IntPtr, ModuleInfo>
+    {
         private readonly IntPtr                     _baseUiObject;
         private readonly IntPtr                     _uiProperties;
         private readonly GetUiObjectByNameDelegate? _getUiObjectByNameDelegate;
         private readonly bool                       _canGetUiObject;
 
-        public InterfaceManager(DalamudPluginInterface pi)
+        public InterfaceManager(DalamudPluginInterface pluginInterface)
+            : base(pluginInterface)
         {
-            _pi                        = pi;
             _baseUiObject              = Service<GetBaseUiObject>.Get().Invoke() ?? IntPtr.Zero;
             _uiProperties              = _baseUiObject != IntPtr.Zero ? Marshal.ReadIntPtr(_baseUiObject, 0x20) : IntPtr.Zero;
             _getUiObjectByNameDelegate = Service<GetUiObjectByName>.Get().Delegate();
@@ -53,6 +40,12 @@ namespace Peon.Managers
             PluginLog.Error("Can not obtain ui objects.");
             return IntPtr.Zero;
         }
+
+        public Task<IntPtr> Add(string name, bool requiresVisible, int timeOutMs)
+            => Add(new ModuleInfo{ Name = name, RequiresVisible = requiresVisible, Inverted = false }, timeOutMs);
+
+        public Task<IntPtr> AddInverted(string name, bool requiresVisible, int timeOutMs)
+            => Add(new ModuleInfo{ Name = name, RequiresVisible = requiresVisible, Inverted = true }, timeOutMs);
 
         // @formatter:off
         public PtrBank                     Bank()                     => GetUiObject("Bank");
@@ -73,84 +66,40 @@ namespace Peon.Managers
         public PtrTitleMenu                TitleMenu()                => GetUiObject("_TitleMenu");
         // @formatter:on
 
-        public Task<IntPtr> Add(string moduleName, bool requiresVisible, int timeOutAfter)
+        protected override unsafe IntPtr OnCheck(ModuleInfo info)
         {
-            var                          ptr  = CheckModule(moduleName, requiresVisible);
-            TaskCompletionSource<IntPtr> task = new();
-            if (ptr != IntPtr.Zero)
-                task.SetResult(ptr);
-            else
-                lock (_waitList)
-                {
-                    if (_waitList.Count == 0)
-                        _pi.Framework.OnUpdateEvent += OnFrameworkUpdate;
-                    var currentTime = (ulong) DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
-                    _waitList.AddLast(new ModuleWait(moduleName, requiresVisible, timeOutAfter, currentTime, task));
-                }
+            var modulePtr = GetUiObject(info.Name, 1);
+            if (modulePtr == IntPtr.Zero)
+                return IntPtr.Zero;
 
-            return task.Task;
-        }
-
-        private unsafe IntPtr CheckModule(string moduleName, bool requiresVisible)
-        {
-            var modulePtr = GetUiObject(moduleName, 1);
-            if (modulePtr != IntPtr.Zero)
+            if (info.Inverted)
             {
                 var basePtr = (AtkUnitBase*) modulePtr.ToPointer();
-                if (basePtr->ULDData.LoadedState == 3 && (!requiresVisible || basePtr->IsVisible))
+                if (info.RequiresVisible && !basePtr->IsVisible)
+                    return IntPtr.Zero;
+                return modulePtr;
+            }
+            else
+            {
+                var basePtr = (AtkUnitBase*) modulePtr.ToPointer();
+                if (basePtr->ULDData.LoadedState == 3 && (!info.RequiresVisible || basePtr->IsVisible))
                     return modulePtr;
             }
 
             return IntPtr.Zero;
         }
 
-        public void Dispose()
-        {
-            if (_waitList.Count > 0)
-            {
-                _pi.Framework.OnUpdateEvent -= OnFrameworkUpdate;
-                foreach (var x in _waitList)
-                    x.Task.SetCanceled();
-            }
 
-            _waitList.Clear();
-        }
+        protected override bool RetIsValid(IntPtr ret, ModuleInfo info)
+            => info.Inverted == (ret == IntPtr.Zero);
 
-        private void RemoveNode(LinkedListNode<ModuleWait> node)
-        {
-            _waitList.Remove(node);
-            if (_waitList.Count != 0)
-                return;
+        protected override void OnTimeout(ModuleInfo info, TaskCompletionSource<IntPtr> task)
+            => task.SetResult(IntPtr.Zero);
 
-            _pi.Framework.OnUpdateEvent -= OnFrameworkUpdate;
-        }
+        protected override string ToString(ModuleInfo info)
+            => info.Name;
 
-        private void OnFrameworkUpdate(object framework)
-        {
-            _currentTime = (ulong) DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
-            var node = _waitList.First;
-            while (node != null)
-            {
-                var next   = node.Next;
-                var module = node.Value;
-                if (module.TimeOut < _currentTime)
-                {
-                    PluginLog.Verbose("Wait for {ModuleName} timed out.", node.Value.ModuleName);
-                    node.Value.Task.SetCanceled();
-                    RemoveNode(node);
-                }
-
-                var modulePtr = CheckModule(module.ModuleName, module.RequiresVisible);
-                if (modulePtr != IntPtr.Zero)
-                {
-                    PluginLog.Verbose("Wait for {ModuleName} returned {ModulePtr}.", node.Value.ModuleName, modulePtr);
-                    node.Value.Task.SetResult(modulePtr);
-                    RemoveNode(node);
-                }
-
-                node.Value = module;
-                node       = next;
-            }
-        }
+        protected override string ToString(IntPtr ret)
+            => ret.ToInt64().ToString("X16");
     }
 }

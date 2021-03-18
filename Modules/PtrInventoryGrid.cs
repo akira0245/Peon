@@ -14,7 +14,7 @@ namespace Peon.Modules
             => new() { Pointer = Module.Cast<AtkUnitBase>(ptr) };
 
         public static implicit operator bool(PtrInventoryGrid ptr)
-            => ptr.Pointer != null;
+            => ptr.Pointer != null && ptr.Pointer->IsVisible;
 
         public bool FeedChocobo()
         {

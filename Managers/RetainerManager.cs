@@ -6,28 +6,9 @@ using Peon.Utility;
 
 namespace Peon.Managers
 {
-    public enum RetainerState
+    public sealed class RetainerManager : WorkManager
     {
-        Error = -1,
-        None  = 0,
-        RetainerListOpen,
-        RetainerMenuOpen,
-        RetainerTaskResultOpen,
-        RetainerTaskAskOpen,
-        RetainerMenuOpen2,
-
-        TaskFinished,
-    }
-
-    public class RetainerManager
-    {
-        private const    int              DefaultTimeOut = 3000;
-        private readonly AddonWatcher     _addons;
-        private readonly BotherHelper     _bothers;
-        private readonly InterfaceManager _interface;
-
-        private RetainerState _state = RetainerState.None;
-        private int           _retainerIdx;
+        private int _retainerIdx;
 
         private PtrRetainerList       _list;
         private PtrRetainerTaskAsk    _taskAsk;
@@ -36,52 +17,36 @@ namespace Peon.Managers
 
         private IntPtr _window;
 
+        public RetainerManager(DalamudPluginInterface pluginInterface, TargetManager target, AddonWatcher addons, BotherHelper bothers,
+            InterfaceManager                          interfaceManager)
+            : base(pluginInterface, target, addons, bothers, interfaceManager)
+        { }
 
-        public string ErrorText = "";
-
-        public RetainerManager(AddonWatcher addons, BotherHelper bothers, InterfaceManager interfaceManager)
-        {
-            _addons    = addons;
-            _bothers   = bothers;
-            _interface = interfaceManager;
-        }
-
-        private RetainerState GetInitialState()
+        protected override WorkState SetInitialState()
         {
             _list = _interface.RetainerList();
             if (_list)
-                return RetainerState.RetainerListOpen;
+                return WorkState.RetainerListOpen;
 
             _retainerMenu = _interface.SelectString();
             if (_retainerMenu)
-                return RetainerState.RetainerMenuOpen;
+                return WorkState.RetainerMenuOpen;
 
             _taskAsk = _interface.RetainerTaskAsk();
             if (_taskAsk)
-                return RetainerState.RetainerTaskAskOpen;
+                return WorkState.RetainerTaskAskOpen;
 
             _taskResult = _interface.RetainerTaskResult();
             if (_taskResult)
-                return RetainerState.RetainerTaskResultOpen;
+                return WorkState.RetainerTaskResultOpen;
 
-            return RetainerState.None;
+            return WorkState.None;
         }
-
 
         public void DoFullRetainer(int idx)
         {
-            try
-            {
-                Task.Run(() =>
-                {
-                    DoFullRetainerTask(idx);
-                    ResetState();
-                });
-            }
-            catch (Exception e)
-            {
-                PluginLog.Error(e, "");
-            }
+            _retainerIdx = idx;
+            DoWork(NextStep);
         }
 
         public void DoAllRetainers()
@@ -99,14 +64,14 @@ namespace Peon.Managers
         private void DoFullRetainerTask(int idx)
         {
             _retainerIdx = idx;
-            while (_state != RetainerState.TaskFinished)
+            while (_state != WorkState.JobFinished)
                 NextStep();
         }
 
         private void DoAllRetainerTask()
         {
             OpenList();
-            if (_state != RetainerState.RetainerListOpen)
+            if (_state != WorkState.RetainerListOpen)
             {
                 NextStep();
             }
@@ -115,9 +80,9 @@ namespace Peon.Managers
                 PtrRetainerList list  = _window;
                 var             count = list.Count;
                 for (var i = 0; i < count; ++i)
-                    if (_state == RetainerState.TaskFinished || _state == RetainerState.RetainerListOpen)
+                    if (_state == WorkState.JobFinished || _state == WorkState.RetainerListOpen)
                     {
-                        _state = RetainerState.RetainerListOpen;
+                        _state = WorkState.RetainerListOpen;
                         DoFullRetainerTask(i);
                     }
                     else
@@ -134,55 +99,50 @@ namespace Peon.Managers
         {
             switch (_state)
             {
-                case RetainerState.Error:
+                case WorkState.Error:
                     PluginLog.Information(ErrorText);
-                    _state = RetainerState.TaskFinished;
+                    _state = WorkState.JobFinished;
                     return false;
-                case RetainerState.None:                   return OpenList();
-                case RetainerState.RetainerListOpen:       return ContactRetainer();
-                case RetainerState.RetainerMenuOpen:       return ViewReport();
-                case RetainerState.RetainerTaskResultOpen: return Reassign();
-                case RetainerState.RetainerTaskAskOpen:    return Assign();
-                case RetainerState.RetainerMenuOpen2:      return Quit();
-                case RetainerState.TaskFinished:           return true;
-                default:                                   return Failure("Unknown state reached.");
+                case WorkState.None:                   return OpenList();
+                case WorkState.RetainerListOpen:       return ContactRetainer();
+                case WorkState.RetainerMenuOpen:       return ViewReport();
+                case WorkState.RetainerTaskResultOpen: return Reassign();
+                case WorkState.RetainerTaskAskOpen:    return Assign();
+                case WorkState.RetainerMenuOpen2:      return Quit();
+                case WorkState.JobFinished:            return true;
+                default:                               return Failure("Unknown state reached.");
             }
         }
 
         private void ResetState()
         {
-            _state       = RetainerState.None;
+            _state       = WorkState.None;
             _retainerIdx = 0;
             _window      = IntPtr.Zero;
             ErrorText    = string.Empty;
-        }
-
-        private bool Failure(string text)
-        {
-            _state    = RetainerState.Error;
-            ErrorText = text;
-            return false;
         }
 
         private bool OpenList()
         {
             var task = _interface.Add("RetainerList", true, DefaultTimeOut);
 
+            var targetTask = _target.Interact(300, a => a.Name == "Summoning Bell");
+            targetTask.Wait();
+            if (targetTask.Result != TargetingState.Success)
+                return Failure($"Targeting failed {targetTask.Result}.");
+
             task.SafeWait();
             if (task.IsCanceled)
-            {
-                Failure("Timeout while opening RetainerList.");
-                return false;
-            }
+                return Failure("Timeout while opening RetainerList.");
 
-            _state  = RetainerState.RetainerListOpen;
+            _state  = WorkState.RetainerListOpen;
             _window = task.Result;
             return true;
         }
 
         private bool ContactRetainer()
         {
-            _bothers.SkipNextTalk = true;
+            using var nextYesno = _bothers.SelectNextYesNo(true);
 
             if (!((PtrRetainerList) _window).Select(_retainerIdx))
             {
@@ -198,7 +158,7 @@ namespace Peon.Managers
                 return false;
             }
 
-            _state  = RetainerState.RetainerMenuOpen;
+            _state  = WorkState.RetainerMenuOpen;
             _window = task.Result;
             return true;
         }
@@ -207,7 +167,7 @@ namespace Peon.Managers
         {
             if (!((PtrSelectString) _window).Select(new CompareString("report. (Complete)", MatchType.EndsWith)))
             {
-                _state = RetainerState.RetainerMenuOpen2;
+                _state = WorkState.RetainerMenuOpen2;
                 return false;
             }
 
@@ -219,7 +179,7 @@ namespace Peon.Managers
                 return false;
             }
 
-            _state  = RetainerState.RetainerTaskResultOpen;
+            _state  = WorkState.RetainerTaskResultOpen;
             _window = task.Result;
             return true;
         }
@@ -235,14 +195,14 @@ namespace Peon.Managers
                 return false;
             }
 
-            _state  = RetainerState.RetainerTaskAskOpen;
+            _state  = WorkState.RetainerTaskAskOpen;
             _window = task.Result;
             return true;
         }
 
         private bool Assign()
         {
-            _bothers.SkipNextTalk = true;
+            using var nextYesno = _bothers.SelectNextYesNo(true);
             ((PtrRetainerTaskAsk) _window).Assign();
             var task = _interface.Add("SelectString", true, DefaultTimeOut);
             task.SafeWait();
@@ -252,15 +212,15 @@ namespace Peon.Managers
                 return false;
             }
 
-            _state  = RetainerState.RetainerMenuOpen2;
+            _state  = WorkState.RetainerMenuOpen2;
             _window = task.Result;
             return true;
         }
 
         private bool Quit()
         {
-            _bothers.SkipNextTalk = true;
-            PtrSelectString select = _window;
+            using var       nextYesno = _bothers.SelectNextYesNo(true);
+            PtrSelectString select    = _window;
             select.Select(select.Count - 1);
 
             var task = _interface.Add("RetainerList", true, DefaultTimeOut);
@@ -271,7 +231,7 @@ namespace Peon.Managers
                 return false;
             }
 
-            _state  = RetainerState.TaskFinished;
+            _state  = WorkState.JobFinished;
             _window = task.Result;
             return true;
         }
