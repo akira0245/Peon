@@ -1,6 +1,5 @@
 ﻿using System;
-using FFXIVClientStructs.Component.GUI;
-using ImGuiScene;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace Peon.Modules
 {

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.ComponentModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Dalamud.Plugin;
 using Peon.Modules;
@@ -6,6 +8,16 @@ using Peon.Utility;
 
 namespace Peon.Managers
 {
+    [Flags]
+    public enum RetainerMode
+    {
+        Venture       = 0x01,
+        Resend        = 0x02,
+        Gil           = 0x04,
+        LootWithGil   = 0x05,
+        ResendWithGil = 0x07,
+    }
+
     public sealed class RetainerManager : WorkManager
     {
         private int _retainerIdx;
@@ -14,8 +26,7 @@ namespace Peon.Managers
         private PtrRetainerTaskAsk    _taskAsk;
         private PtrRetainerTaskResult _taskResult;
         private PtrSelectString       _retainerMenu;
-
-        private IntPtr _window;
+        private PtrBank               _bank;
 
         public RetainerManager(DalamudPluginInterface pluginInterface, TargetManager target, AddonWatcher addons, BotherHelper bothers,
             InterfaceManager                          interfaceManager)
@@ -24,215 +35,298 @@ namespace Peon.Managers
 
         protected override WorkState SetInitialState()
         {
-            _list = _interface.RetainerList();
+            _list = Interface.RetainerList();
             if (_list)
                 return WorkState.RetainerListOpen;
 
-            _retainerMenu = _interface.SelectString();
+            _retainerMenu = Interface.SelectString();
             if (_retainerMenu)
                 return WorkState.RetainerMenuOpen;
 
-            _taskAsk = _interface.RetainerTaskAsk();
+            _taskAsk = Interface.RetainerTaskAsk();
             if (_taskAsk)
                 return WorkState.RetainerTaskAskOpen;
 
-            _taskResult = _interface.RetainerTaskResult();
+            _taskResult = Interface.RetainerTaskResult();
             if (_taskResult)
                 return WorkState.RetainerTaskResultOpen;
 
             return WorkState.None;
         }
 
-        public void DoFullRetainer(int idx)
-        {
-            _retainerIdx = idx;
-            DoWork(NextStep);
-        }
+        public void DoAllRetainers(RetainerMode mode)
+            => DoWork(PrependMulti(mode));
 
-        public void DoAllRetainers()
+        public void DoSpecificRetainers(RetainerMode mode, params int[] which)
         {
-            try
+            foreach (var idx in which)
             {
-                Task.Run(DoAllRetainerTask);
-            }
-            catch (Exception e)
-            {
-                PluginLog.Error(e, "");
+                _retainerIdx = idx;
+                DoWork(ChooseFunc(mode));
             }
         }
 
-        private void DoFullRetainerTask(int idx)
+        private Func<bool> ChooseFunc(RetainerMode mode)
         {
-            _retainerIdx = idx;
-            while (_state != WorkState.JobFinished)
-                NextStep();
+            return mode switch
+            {
+                RetainerMode.ResendWithGil => ResendOneRetainerWithGil,
+                RetainerMode.Resend        => ResendOneRetainer,
+                RetainerMode.LootWithGil   => LootOneRetainer,
+                RetainerMode.Venture       => LootOneRetainerVenture,
+                RetainerMode.Gil           => LootOneRetainerGil,
+                _                          => throw new InvalidEnumArgumentException(),
+            };
         }
 
-        private void DoAllRetainerTask()
+        private Func<bool> PrependMulti(RetainerMode mode)
         {
-            OpenList();
-            if (_state != WorkState.RetainerListOpen)
+            return () =>
             {
-                NextStep();
-            }
-            else
-            {
-                PtrRetainerList list  = _window;
-                var             count = list.Count;
-                for (var i = 0; i < count; ++i)
-                    if (_state == WorkState.JobFinished || _state == WorkState.RetainerListOpen)
-                    {
-                        _state = WorkState.RetainerListOpen;
-                        DoFullRetainerTask(i);
-                    }
-                    else
-                    {
-                        ResetState();
-                        return;
-                    }
-            }
+                switch (State)
+                {
+                    case WorkState.RetainerListOpen:
+                        _retainerIdx = -1;
+                        var data = _list.Info();
+                        _retainerIdx = data.SelectFirstOr(d => d.Venture == VentureState.Complete && mode.HasFlag(RetainerMode.Venture)
+                         || d.Gil > 0 && mode.HasFlag(RetainerMode.Gil), d => d.Index, -1);
+                        if (_retainerIdx >= 0)
+                            return ContactRetainer();
 
-            ResetState();
+                        State = WorkState.JobFinished;
+                        return true;
+
+                    case WorkState.RetainerMenuOpenDone:
+                        var ret = Quit();
+                        if (ret)
+                            State = WorkState.RetainerListOpen;
+                        return ret;
+                    default: return ChooseFunc(mode)();
+                }
+            };
         }
 
-        private bool NextStep()
+        private bool ResendOneRetainer()
         {
-            switch (_state)
+            return State switch
             {
-                case WorkState.Error:
-                    PluginLog.Information(ErrorText);
-                    _state = WorkState.JobFinished;
-                    return false;
-                case WorkState.None:                   return OpenList();
-                case WorkState.RetainerListOpen:       return ContactRetainer();
-                case WorkState.RetainerMenuOpen:       return ViewReport();
-                case WorkState.RetainerTaskResultOpen: return Reassign();
-                case WorkState.RetainerTaskAskOpen:    return Assign();
-                case WorkState.RetainerMenuOpen2:      return Quit();
-                case WorkState.JobFinished:            return true;
-                default:                               return Failure("Unknown state reached.");
-            }
+                WorkState.None                   => OpenList(),
+                WorkState.RetainerListOpen       => ContactRetainer(),
+                WorkState.RetainerMenuOpen       => ViewReport(),
+                WorkState.RetainerTaskResultOpen => Reassign(),
+                WorkState.RetainerTaskAskOpen    => Assign(),
+                WorkState.RetainerMenuOpenDone   => Quit(),
+                _                                => Failure("Unknown state reached."),
+            };
         }
 
-        private void ResetState()
+        private bool ResendOneRetainerWithGil()
         {
-            _state       = WorkState.None;
-            _retainerIdx = 0;
-            _window      = IntPtr.Zero;
-            ErrorText    = string.Empty;
+            return State switch
+            {
+                WorkState.None                   => OpenList(),
+                WorkState.RetainerListOpen       => ContactRetainer(),
+                WorkState.RetainerMenuOpen       => OpenBank(),
+                WorkState.RetainerBankOpen       => TakeGil(),
+                WorkState.RetainerMenuOpenBank   => ViewReport(),
+                WorkState.RetainerTaskResultOpen => Reassign(),
+                WorkState.RetainerTaskAskOpen    => Assign(),
+                WorkState.RetainerMenuOpenDone   => Quit(),
+                _                                => Failure("Unknown state reached."),
+            };
+        }
+
+        private bool LootOneRetainer()
+        {
+            return State switch
+            {
+                WorkState.None                   => OpenList(),
+                WorkState.RetainerListOpen       => ContactRetainer(),
+                WorkState.RetainerMenuOpen       => OpenBank(),
+                WorkState.RetainerBankOpen       => TakeGil(),
+                WorkState.RetainerMenuOpenBank   => ViewReport(),
+                WorkState.RetainerTaskResultOpen => Accept(),
+                WorkState.RetainerMenuOpenDone   => Quit(),
+                _                                => Failure("Unknown state reached."),
+            };
+        }
+
+        private bool LootOneRetainerVenture()
+        {
+            return State switch
+            {
+                WorkState.None                   => OpenList(),
+                WorkState.RetainerListOpen       => ContactRetainer(),
+                WorkState.RetainerMenuOpen       => ViewReport(),
+                WorkState.RetainerTaskResultOpen => Accept(),
+                WorkState.RetainerMenuOpenDone   => Quit(),
+                _                                => Failure("Unknown state reached."),
+            };
+        }
+
+        private bool LootOneRetainerGil()
+        {
+            return State switch
+            {
+                WorkState.None                 => OpenList(),
+                WorkState.RetainerListOpen     => ContactRetainer(),
+                WorkState.RetainerMenuOpen     => OpenBank(),
+                WorkState.RetainerBankOpen     => TakeGil(),
+                WorkState.RetainerMenuOpenBank => Quit(),
+                _                              => Failure("Unknown state reached."),
+            };
         }
 
         private bool OpenList()
         {
-            var task = _interface.Add("RetainerList", true, DefaultTimeOut);
+            var task = Interface.Add("RetainerList", true, DefaultTimeOut);
 
-            var targetTask = _target.Interact(300, a => a.Name == "Summoning Bell");
-            targetTask.Wait();
-            if (targetTask.Result != TargetingState.Success)
+            var targetTask = Target.Interact("Summoning Bell", DefaultTimeOut / 6);
+            Wait(targetTask);
+            if (!targetTask.IsCompleted || targetTask.Result != TargetingState.Success)
                 return Failure($"Targeting failed {targetTask.Result}.");
 
-            task.SafeWait();
-            if (task.IsCanceled)
+            Wait(task);
+            if (!task.IsCompleted || task.Result == IntPtr.Zero)
                 return Failure("Timeout while opening RetainerList.");
 
-            _state  = WorkState.RetainerListOpen;
-            _window = task.Result;
+            State = WorkState.RetainerListOpen;
+            _list  = task.Result;
             return true;
+        }
+
+        private void SetNextRetainer(bool handleGil)
+        {
+            var data = _list.Info();
         }
 
         private bool ContactRetainer()
         {
-            using var nextYesno = _bothers.SelectNextYesNo(true);
+            using var nextTalk = Bothers.SkipNextTalk();
 
-            if (!((PtrRetainerList) _window).Select(_retainerIdx))
-            {
-                Failure("Invalid index for RetainerList.");
-                return false;
-            }
+            var task = Interface.Add("SelectString", true, DefaultTimeOut);
 
-            var task = _interface.Add("SelectString", true, DefaultTimeOut);
-            task.SafeWait();
-            if (task.IsCanceled)
-            {
-                Failure("Timeout while contacting retainer.");
-                return false;
-            }
+            if (!_list.Select(_retainerIdx))
+                return Failure("Invalid index for RetainerList.");
 
-            _state  = WorkState.RetainerMenuOpen;
-            _window = task.Result;
+            Wait(task);
+            if (!task.IsCompleted || task.Result == IntPtr.Zero)
+                return Failure("Timeout while contacting retainer.");
+
+            State        = WorkState.RetainerMenuOpen;
+            _list         = IntPtr.Zero;
+            _retainerMenu = task.Result;
             return true;
         }
 
+        private bool OpenBank()
+        {
+            if (!_retainerMenu.Select(new CompareString("Entrust or withdraw gil.", MatchType.Equal)))
+                return Failure("Could not find bank button.");
+
+            var task = Interface.Add("Bank", true, DefaultTimeOut);
+            Wait(task);
+            if (!task.IsCompleted || task.Result == IntPtr.Zero)
+                return Failure("Timeout while opening bank.");
+
+            State        = WorkState.RetainerBankOpen;
+            _retainerMenu = IntPtr.Zero;
+            _bank         = task.Result;
+            return true;
+        }
+
+        private bool TakeGil()
+        {
+            _bank.Minus();
+            _bank.Proceed();
+
+            var task = Interface.Add("SelectString", true, DefaultTimeOut);
+            Wait(task);
+            if (!task.IsCompleted || task.Result == IntPtr.Zero)
+                return Failure("Timeout while obtaining gil.");
+
+            State        = WorkState.RetainerMenuOpenBank;
+            _bank         = IntPtr.Zero;
+            _retainerMenu = task.Result;
+            return true;
+        }
+
+
         private bool ViewReport()
         {
-            if (!((PtrSelectString) _window).Select(new CompareString("report. (Complete)", MatchType.EndsWith)))
+            if (!_retainerMenu.Select(new CompareString("report. (Complete)", MatchType.EndsWith)))
             {
-                _state = WorkState.RetainerMenuOpen2;
-                return false;
+                State = WorkState.RetainerMenuOpenDone;
+                return true;
             }
 
-            var task = _interface.Add("RetainerTaskResult", true, DefaultTimeOut);
-            task.SafeWait();
-            if (task.IsCanceled)
-            {
-                Failure("Timeout while obtaining venture report.");
-                return false;
-            }
+            var task = Interface.Add("RetainerTaskResult", true, DefaultTimeOut);
+            Wait(task);
+            if (!task.IsCompleted || task.Result == IntPtr.Zero)
+                return Failure("Timeout while obtaining venture report.");
 
-            _state  = WorkState.RetainerTaskResultOpen;
-            _window = task.Result;
+            State        = WorkState.RetainerTaskResultOpen;
+            _retainerMenu = IntPtr.Zero;
+            _taskResult   = task.Result;
             return true;
         }
 
         private bool Reassign()
         {
-            ((PtrRetainerTaskResult) _window).Reassign();
-            var task = _interface.Add("RetainerTaskAsk", true, DefaultTimeOut);
-            task.SafeWait();
-            if (task.IsCanceled)
-            {
-                Failure("Timeout while obtaining new venture target.");
-                return false;
-            }
+            _taskResult.Reassign();
+            var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut);
+            Wait(task);
+            if (!task.IsCompleted || task.Result == IntPtr.Zero)
+                return Failure("Timeout while obtaining new venture target.");
 
-            _state  = WorkState.RetainerTaskAskOpen;
-            _window = task.Result;
+            State      = WorkState.RetainerTaskAskOpen;
+            _taskResult = IntPtr.Zero;
+            _taskAsk    = task.Result;
+            return true;
+        }
+
+        private bool Accept()
+        {
+            _taskResult.Confirm();
+            var task = Interface.Add("SelectString", true, DefaultTimeOut);
+            Wait(task);
+            if (!task.IsCompleted || task.Result == IntPtr.Zero)
+                return Failure("Timeout while accepting venture loot.");
+
+            State        = WorkState.RetainerMenuOpenDone;
+            _taskResult   = IntPtr.Zero;
+            _retainerMenu = task.Result;
             return true;
         }
 
         private bool Assign()
         {
-            using var nextYesno = _bothers.SelectNextYesNo(true);
-            ((PtrRetainerTaskAsk) _window).Assign();
-            var task = _interface.Add("SelectString", true, DefaultTimeOut);
-            task.SafeWait();
-            if (task.IsCanceled)
-            {
-                Failure("Timeout while assigning venture.");
-                return false;
-            }
+            using var nextTalk = Bothers.SkipNextTalk();
+            _taskAsk.Assign();
+            var task = Interface.Add("SelectString", true, DefaultTimeOut);
+            Wait(task);
+            if (!task.IsCompleted || task.Result == IntPtr.Zero)
+                return Failure("Timeout while assigning venture.");
 
-            _state  = WorkState.RetainerMenuOpen2;
-            _window = task.Result;
+            State        = WorkState.RetainerMenuOpenDone;
+            _taskAsk      = IntPtr.Zero;
+            _retainerMenu = task.Result;
             return true;
         }
 
         private bool Quit()
         {
-            using var       nextYesno = _bothers.SelectNextYesNo(true);
-            PtrSelectString select    = _window;
-            select.Select(select.Count - 1);
+            using var nextTalk = Bothers.SkipNextTalk();
+            _retainerMenu.Select(_retainerMenu.Count - 1);
 
-            var task = _interface.Add("RetainerList", true, DefaultTimeOut);
-            task.SafeWait();
-            if (task.IsCanceled)
-            {
-                Failure("Timeout while quitting retainer.");
-                return false;
-            }
+            var task = Interface.Add("RetainerList", true, DefaultTimeOut);
+            Wait(task);
+            if (!task.IsCompleted || task.Result == IntPtr.Zero)
+                return Failure("Timeout while quitting retainer.");
 
-            _state  = WorkState.JobFinished;
-            _window = task.Result;
+            State        = WorkState.JobFinished;
+            _retainerMenu = IntPtr.Zero;
+            _list         = task.Result;
             return true;
         }
     }

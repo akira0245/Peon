@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using FFXIVClientStructs.Component.GUI;
+using Dalamud.Plugin;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace Peon.Modules
 {
@@ -15,7 +16,7 @@ namespace Peon.Modules
 
         public static string ImageNodeToTexture(AtkImageNode* node)
         {
-            var texInfo = node->PartsList->Parts[node->PartId].ULDTexture;
+            var texInfo = node->PartsList->Parts[node->PartId].UldAsset;
             return Marshal.PtrToStringAnsi(new IntPtr(texInfo->AtkTexture.Resource->TexFileResourceHandle->ResourceHandle.FileName))!;
         }
 
@@ -87,6 +88,7 @@ namespace Peon.Modules
         {
             var table = ObtainVTable(addon);
             var ptr   = table[2];
+            PluginLog.Verbose("Using Vfunc[2] at +0x{Ptr:X16}", (long) ptr - Peon.BaseAddress);
             return Marshal.GetDelegateForFunctionPointer<ReceiveEventDelegate>(new IntPtr(ptr));
         }
 

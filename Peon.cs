@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using System.Xml.XPath;
 using Dalamud.Game;
 using Dalamud.Game.Command;
+using Dalamud.Game.Internal;
 using Dalamud.Hooking;
 using Dalamud.Plugin;
 using Peon.Managers;
@@ -51,6 +52,8 @@ namespace Peon
         private LoginManager?           _login;
         private ChocoboManager?         _chocobos;
 
+        public static long BaseAddress;
+
 
         public void SetupServices(DalamudPluginInterface pluginInterface)
         {
@@ -68,26 +71,33 @@ namespace Peon
 
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
-            _pluginInterface  = pluginInterface;
-            _configuration    = _pluginInterface.GetPluginConfig() as PeonConfiguration ?? new PeonConfiguration();
-            SetupServices(_pluginInterface);
-
-            _interfaceManager = new InterfaceManager(pluginInterface);
-            _addons           = new AddonWatcher(pluginInterface);
-            _inputManager     = new InputManager();
-            _targeting        = new TargetManager(pluginInterface, _inputManager, _addons);
-            _ohBother         = new BotherHelper(_pluginInterface, _addons, _configuration);
-            _retainers        = new RetainerManager(_pluginInterface, _targeting, _addons!, _ohBother, _interfaceManager!);
-            _login            = new LoginManager(_pluginInterface, _ohBother, _interfaceManager!, _inputManager!);
-            _chocobos         = new ChocoboManager(_pluginInterface, _targeting, _addons, _ohBother, _interfaceManager);
-
-            _pluginInterface.SavePluginConfig(_configuration);
-
-            _pluginInterface.CommandManager.AddHandler("/peon", new CommandInfo(OnRetainer)
+            try
             {
-                HelpMessage = "Send Retainers, either 'all' or a comma-separated list of indices.",
-                ShowInHelp  = true,
-            });
+                _pluginInterface = pluginInterface;
+                _configuration   = _pluginInterface.GetPluginConfig() as PeonConfiguration ?? new PeonConfiguration();
+                SetupServices(_pluginInterface);
+                _interfaceManager = new InterfaceManager(pluginInterface);
+                _addons           = new AddonWatcher(pluginInterface);
+                _inputManager     = new InputManager();
+                _targeting        = new TargetManager(pluginInterface, _inputManager, _addons);
+                _ohBother         = new BotherHelper(_pluginInterface, _addons, _configuration);
+                _retainers        = new RetainerManager(_pluginInterface, _targeting, _addons!, _ohBother, _interfaceManager!);
+                _login            = new LoginManager(_pluginInterface, _ohBother, _interfaceManager!, _inputManager!);
+                _chocobos         = new ChocoboManager(_pluginInterface, _targeting, _addons, _ohBother, _interfaceManager);
+                BaseAddress       = _pluginInterface.TargetModuleScanner.Module.BaseAddress.ToInt64();
+
+                _pluginInterface.SavePluginConfig(_configuration);
+
+                _pluginInterface.CommandManager.AddHandler("/peon", new CommandInfo(OnRetainer)
+                {
+                    HelpMessage = "Send Retainers, either 'all' or a comma-separated list of indices.",
+                    ShowInHelp  = true,
+                });
+            }
+            catch (Exception e)
+            {
+                PluginLog.Error($"{e}");
+            }
         }
 
         public void Dispose()
@@ -133,11 +143,14 @@ namespace Peon
                 case "allturnin":
                     Task.Run(() =>
                     {
-                        var ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("GrandCompanySupplyList", 1);
-                        if (ptr != IntPtr.Zero)
+                        Task.Run(() =>
                         {
+                            var ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("GrandCompanySupplyList", 1);
+                            if (ptr == IntPtr.Zero)
+                                return;
+
                             PtrGrandCompanySupplyList s = ptr;
-                            while(s.Count > 0)
+                            while (s.Count > 0)
                             {
                                 s.Select(0);
                                 var task = _interfaceManager.Add("GrandCompanySupplyReward", false, 3000);
@@ -146,6 +159,7 @@ namespace Peon
                                     return;
 
                                 ((PtrGrandCompanySupplyReward) task.Result).Deliver();
+                                Task.Delay(50).Wait();
                                 task = _interfaceManager.Add("GrandCompanySupplyList", false, 3000);
                                 task.SafeWait();
                                 if (task.IsCanceled)
@@ -153,19 +167,19 @@ namespace Peon
 
                                 s = task.Result;
                             }
-                        }
+                        });
                     });
                     break;
                 case "logout":
-                    _login!.OpenMenu(3000);
+                    _login!.NextCharacter(5000);
                     break;
                 case "allretainer":
-                    _retainers!.DoAllRetainers();
+                    _retainers!.DoAllRetainers(RetainerMode.ResendWithGil);
                     break;
                 case "retainer":
                     if (argumentParts.Length < 2)
                         return;
-                    _retainers!.DoFullRetainer(int.Parse(argumentParts[1]));
+                    _retainers!.DoSpecificRetainers(RetainerMode.ResendWithGil, argumentParts[1].Split(' ').Select( int.Parse ).ToArray());
                     break;
                 case "retainertest":
                     _interfaceManager.RetainerList().SelectFirstComplete();

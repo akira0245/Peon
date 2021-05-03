@@ -1,6 +1,8 @@
 ﻿using System;
-using FFXIVClientStructs;
-using FFXIVClientStructs.Component.GUI;
+using Dalamud.Plugin;
+using FFXIVClientStructs.FFXIV.Client.Graphics;
+using FFXIVClientStructs.FFXIV.Component.GUI;
+using Peon.Utility;
 
 namespace Peon.Modules
 {
@@ -27,16 +29,17 @@ namespace Peon.Modules
             => Module.ClickList(Pointer, ChocoboListNode, idx, 3);
 
 
-        private bool IsMaxLevelColor(FFXIVByteColor color)
+        private bool IsMaxLevelColor(ByteColor color)
             => color.R == 0xFF && color.G == 0xC5 && color.B == 0xE1 && color.A == 0xAA;
 
         private bool TrainableChocobo(AtkComponentListItemRenderer* renderer)
         {
             
-            var rootNode   = renderer->AtkComponentButton.AtkComponentBase.ULDData.RootNode;
+            var rootNode   = renderer->AtkComponentButton.AtkComponentBase.UldManager.RootNode;
             var res1       = rootNode->PrevSiblingNode->PrevSiblingNode->PrevSiblingNode->ChildNode->PrevSiblingNode;
             var statusTextNode = (AtkTextNode*) res1->ChildNode->PrevSiblingNode;
-            if (Module.TextNodeToString(statusTextNode) != "Ready")
+            var s = Module.TextNodeToString(statusTextNode);
+            if (s != "Ready")
                 return false;
 
             var levelTextNode = (AtkTextNode*) res1->PrevSiblingNode->PrevSiblingNode->PrevSiblingNode->PrevSiblingNode->ChildNode->PrevSiblingNode;
@@ -47,6 +50,13 @@ namespace Peon.Modules
         {
             var list      = ChocoboListNode;
             var component = (AtkComponentList*) list->Component;
+
+            // List is sometimes not up at the same time as module,
+            // and buttons return errors even if they are setup correctly, thus the long wait.
+            TaskExtension.WaitUntil(() => component->ItemRendererList != null, 5000, 1000);
+            if (component->ItemRendererList == null)
+                return false;
+
             for (var i = 0; i < component->ListLength; ++i)
             {
                 var renderer = component->ItemRendererList[i].AtkComponentListItemRenderer;

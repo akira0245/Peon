@@ -1,6 +1,6 @@
 ﻿using System;
-using FFXIVClientStructs.Client.UI;
-using FFXIVClientStructs.Component.GUI;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 using Peon.Utility;
 
 namespace Peon.Modules
@@ -17,20 +17,20 @@ namespace Peon.Modules
             => ptr.Pointer != null;
 
         public bool Select(int idx)
-            => Module.ClickList(&Pointer->vtbl238, Pointer->AtkComponentList->AtkComponentBase.OwnerNode, idx);
+            => Module.ClickList(&Pointer->PopupMenu.vtbl, Pointer->PopupMenu.List->AtkComponentBase.OwnerNode, idx);
 
         public string Description()
             => Module.TextNodeToString((AtkTextNode*) Pointer->AtkUnitBase.RootNode->ChildNode->PrevSiblingNode->PrevSiblingNode);
 
         public int Count
-            => Pointer->AtkComponentList->ListLength;
+            => Pointer->PopupMenu.List->ListLength;
 
         public string ItemText(int idx)
-            => Module.TextNodeToString(Pointer->AtkComponentList->ItemRendererList[idx]
+            => Module.TextNodeToString(Pointer->PopupMenu.List->ItemRendererList[idx]
                .AtkComponentListItemRenderer->AtkComponentButton.ButtonTextNode);
 
         public bool Select(CompareString text)
-            => Module.ClickList(&Pointer->vtbl238, Pointer->AtkComponentList->AtkComponentBase.OwnerNode,
+            => Module.ClickList(&Pointer->PopupMenu.vtbl, Pointer->PopupMenu.List->AtkComponentBase.OwnerNode,
                 item => text.Matches(Module.TextNodeToString(item->AtkComponentButton.ButtonTextNode)));
     }
 }

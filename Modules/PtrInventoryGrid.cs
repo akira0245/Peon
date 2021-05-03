@@ -1,5 +1,5 @@
 ﻿using System;
-using FFXIVClientStructs.Component.GUI;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace Peon.Modules
 {
@@ -25,8 +25,8 @@ namespace Peon.Modules
             while (item != null)
             {
                 var component = (AtkComponentDragDrop*) ((AtkComponentNode*) item)->Component;
-                var frame     = component->AtkComponentBase.ULDData.NodeList[1];
-                var icon      = component->AtkComponentBase.ULDData.NodeList[2];
+                var frame     = component->AtkComponentBase.UldManager.NodeList[1];
+                var icon      = component->AtkComponentBase.UldManager.NodeList[2];
                 if (frame->IsVisible && icon->IsVisible)
                 {
                     using Module.EventData data = new(item, (byte*) component + DataOffset);

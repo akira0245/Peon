@@ -14,9 +14,11 @@ namespace Peon.Managers
         // Retainer
         RetainerListOpen       = 1,
         RetainerMenuOpen       = 2,
-        RetainerTaskResultOpen = 3,
-        RetainerTaskAskOpen    = 4,
-        RetainerMenuOpen2      = 5,
+        RetainerBankOpen       = 3,
+        RetainerMenuOpenBank   = 5,
+        RetainerTaskResultOpen = 6,
+        RetainerTaskAskOpen    = 7,
+        RetainerMenuOpenDone   = 8,
 
         // Stables
         ChocoboMenuOpen = 1,
@@ -30,33 +32,46 @@ namespace Peon.Managers
     public class WorkManager
     {
         protected const    int              DefaultTimeOut = 3000;
-        protected readonly TargetManager    _target;
-        protected readonly AddonWatcher     _addons;
-        protected readonly BotherHelper     _bothers;
-        protected readonly InterfaceManager _interface;
-        protected readonly ChatGui          _chat;
+        protected readonly TargetManager    Target;
+        protected readonly AddonWatcher     Addons;
+        protected readonly BotherHelper     Bothers;
+        protected readonly InterfaceManager Interface;
+        protected readonly ChatGui          Chat;
 
-        protected WorkState _state;
+        protected WorkState State;
         public    string    ErrorText = "";
 
-        private static volatile   bool                     _jobRunning = false;
-        protected static volatile CancellationTokenSource? CancelToken;
+        private volatile   bool                     _jobRunning = false;
+        protected volatile CancellationTokenSource? CancelToken;
 
         public void Cancel()
         {
-            if (CancelToken == null || CancelToken.IsCancellationRequested || CancelToken.Token.CanBeCanceled)
+            if (CancelToken == null || CancelToken.IsCancellationRequested || !CancelToken.Token.CanBeCanceled)
                 return;
 
             CancelToken.Cancel();
-            _chat.Print("Cancellation of current job requested.");
+            Chat.Print("Cancellation of current job requested.");
         }
+
+        protected void Wait<T>(Task<T> task)
+        {
+            try
+            {
+                task.Wait(CancelToken!.Token);
+            }
+            catch (OperationCanceledException)
+            { }
+        } 
+
+        protected void Wait(Task task)
+            => task.Wait(CancelToken!.Token);
 
         protected virtual WorkState SetInitialState()
             => throw new NotImplementedException();
 
         protected bool Failure(string text)
         {
-            _state    = WorkState.Error;
+            State    = WorkState.Error;
             ErrorText = text;
             return false;
         }
@@ -64,24 +79,24 @@ namespace Peon.Managers
         protected WorkManager(DalamudPluginInterface pluginInterface, TargetManager target, AddonWatcher addons, BotherHelper bothers,
             InterfaceManager                         iManager)
         {
-            _chat      = pluginInterface.Framework.Gui.Chat;
-            _target    = target;
-            _addons    = addons;
-            _bothers   = bothers;
-            _interface = iManager;
+            Chat      = pluginInterface.Framework.Gui.Chat;
+            Target    = target;
+            Addons    = addons;
+            Bothers   = bothers;
+            Interface = iManager;
         }
 
         protected void DoWork(Func<bool> stateHandler)
         {
-            //if (_jobRunning)
-            //{
-            //    _chat.PrintError($"[{GetType().Name}] Can not start job. Job is already running.");
-            //    return;
-            //}
+            if (_jobRunning)
+            {
+                Chat.PrintError($"[{GetType().Name}] Can not start job. Job is already running.");
+                return;
+            }
 
             try
             {
-                _state      = SetInitialState();
+                State      = SetInitialState();
                 _jobRunning = true;
                 CancelToken?.Dispose();
                 CancelToken = new CancellationTokenSource();
@@ -96,19 +111,26 @@ namespace Peon.Managers
 
         protected void DoWorkTask(Func<bool> stateHandler)
         {
-            while (_state != WorkState.JobFinished && !CancelToken!.IsCancellationRequested)
-                if (_state == WorkState.Error)
-                {
-                    PluginLog.Error("Error during job: {Error:l}", ErrorText);
-                    _chat.PrintError(ErrorText);
-                    _state = WorkState.JobFinished;
-                }
-                else
-                {
-                    stateHandler();
-                }
-
-            _jobRunning = false;
+            try
+            {
+                while (State != WorkState.JobFinished && !CancelToken!.IsCancellationRequested)
+                    if (State == WorkState.Error)
+                    {
+                        PluginLog.Error("Error during job: {Error:l}", ErrorText);
+                        Chat.PrintError(ErrorText);
+                        State = WorkState.JobFinished;
+                    }
+                    else
+                    {
+                        stateHandler();
+                    }
+                _jobRunning = false;
+            }
+            catch (Exception)
+            {
+                _jobRunning = false;
+                throw;
+            }
         }
     }
 }

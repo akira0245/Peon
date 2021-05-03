@@ -1,4 +1,4 @@
-﻿using FFXIVClientStructs.Component.GUI;
+﻿using FFXIVClientStructs.FFXIV.Component.GUI;
 using Peon.Modules;
 
 namespace Peon.Utility
@@ -39,7 +39,7 @@ namespace Peon.Utility
 
         private static unsafe AtkResNode* FirstInfoNode(AtkComponentListItemRenderer* item)
         {
-            var rootNode = item->AtkComponentButton.AtkComponentBase.ULDData.RootNode;
+            var rootNode = item->AtkComponentButton.AtkComponentBase.UldManager.RootNode;
             return rootNode->PrevSiblingNode->PrevSiblingNode->PrevSiblingNode->ChildNode;
         }
 

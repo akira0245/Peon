@@ -17,5 +17,15 @@ namespace Peon.Utility
                 errors.Handle(e => e is TaskCanceledException);
             }
         }
+
+        public static void WaitUntil(Func<bool> pred, uint timeout, uint frequency = 25)
+        {
+            uint counter = 0;
+            while (!pred() && counter <= timeout)
+            {
+                counter += frequency;
+                Task.Delay((int)frequency).Wait();
+            }
+        }
     }
 }

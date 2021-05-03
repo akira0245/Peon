@@ -24,16 +24,13 @@ namespace Peon.Managers
             _botherHelper     = botherHelper;
         }
 
-        public void OpenMenu(int timeout)
+        public void NextCharacter(int timeout)
         {
             _canceled          = false;
             _lastCharacterName = _pluginInterface.ClientState.LocalPlayer?.Name ?? "";
             Task.Run(() =>
             {
-                var ptr = OpenMenuTask(timeout);
-                if (ptr == IntPtr.Zero || _canceled)
-                    return;
-                ptr = LogOut(ptr);
+                var ptr = LogOut(timeout);
                 if (ptr == IntPtr.Zero || _canceled)
                     return;
                 ptr = ClickStart(ptr);
@@ -53,33 +50,30 @@ namespace Peon.Managers
             _characters = null;
         }
 
-        private IntPtr OpenMenuTask(int timeout)
+        private IntPtr LogOut(int timeout)
         {
-            for (var waitTime = 0; waitTime < timeout; waitTime += 100)
-            {
-                var task      = _interfaceManager.Add("SystemMenu", false, 100);
-                task.SafeWait();
-                if (!task.IsCanceled)
-                    return task.Result;
-
-                _inputManager.SendKeyPress(InputManager.Escape);
-            }
-
-            return IntPtr.Zero;
-        }
-
-        private IntPtr LogOut(IntPtr systemMenu)
-        {
-            using var       nextYesno = _botherHelper.SelectNextYesNo(true);
-            PtrSelectString list      = systemMenu;
-            if (!list.Select(new CompareString("Log Out", MatchType.Equal)))
+            var task = _interfaceManager.Add("_MainCommand", true, timeout);
+            task.SafeWait();
+            if (task.IsCanceled)
                 return IntPtr.Zero;
 
-            var task = _interfaceManager.Add("_TitleMenu", true, 10000);
+            PtrMainCommand main = task.Result;
+            main.System();
+
+            task = _interfaceManager.Add("AddonContextMenuTitle", true, timeout);
+            task.SafeWait();
+            if (task.IsCanceled)
+                return IntPtr.Zero;
+            
+            using var nextYesno = _botherHelper.SelectNextYesNo(true);
+            PtrContextMenuTitle menu      = task.Result;
+            if (!menu.Select(new CompareString("Log Out", MatchType.Equal)))
+                return IntPtr.Zero;
+
+            task = _interfaceManager.Add("_TitleMenu", true, timeout);
             task.SafeWait();
             return task.IsCanceled ? IntPtr.Zero : task.Result;
         }
-
         private IntPtr ClickStart(IntPtr titleMenu)
         {
             PtrTitleMenu menu = titleMenu;

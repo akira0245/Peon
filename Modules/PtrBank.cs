@@ -1,6 +1,6 @@
 ﻿using System;
-using FFXIVClientStructs.Client.UI;
-using FFXIVClientStructs.Component.GUI;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace Peon.Modules
 {
@@ -21,35 +21,14 @@ namespace Peon.Modules
             => ptr.Pointer != null;
 
         private AtkComponentNode* CancelButton
-            => (AtkComponentNode*) Pointer->RootNode->PrevSiblingNode;
+            => (AtkComponentNode*) Pointer->RootNode->ChildNode->PrevSiblingNode;
 
         private AtkComponentNode* ProceedButton
-        {
-            get
-            {
-                var root = Pointer->RootNode;
-                var x    = root->ChildNode;
-                var y    = x->PrevSiblingNode;
-                var z    = y->PrevSiblingNode;
-                return (AtkComponentNode*) z;
-            }
-        }
+            => (AtkComponentNode*) Pointer->RootNode->ChildNode->PrevSiblingNode->PrevSiblingNode;
 
         private AtkComponentNode* NumberInput
-        {
-            get
-            {
-                var root = Pointer->RootNode;
-                var x    = root->ChildNode;
-                var y    = x->PrevSiblingNode;
-                var z    = y->PrevSiblingNode;
-                var a    = z->PrevSiblingNode;
-                var b    = a->PrevSiblingNode;
-                var c    = b->ChildNode;
-                var d    = c->PrevSiblingNode;
-                return (AtkComponentNode*) d;
-            }
-        }
+            => (AtkComponentNode*) Pointer->RootNode->ChildNode->PrevSiblingNode->PrevSiblingNode
+                ->PrevSiblingNode->PrevSiblingNode->ChildNode->PrevSiblingNode;
 
         public void Proceed()
             => Module.ClickAddon(Pointer, ProceedButton, EventType.Change, ProceedButtonId);
@@ -59,7 +38,7 @@ namespace Peon.Modules
 
         public void Minus()
         {
-            using Module.EventData data = new(Int32.MaxValue);
+            using Module.EventData data = new(int.MaxValue);
             Module.ClickAddon(Pointer, NumberInput, (EventType) 0x1B, NumberInputId, data.Data);
             Proceed();
         }

@@ -36,9 +36,11 @@ namespace Peon.Managers
 
             internal BotherSetter(bool skipNextTalk, bool? selectNextYesNo, BotherHelper bother)
             {
-                _bother             = bother;
-                _skipNextTalkOld    = bother._skipNextTalk;
-                _selectNextYesNoOld = bother._selectNextYesNo;
+                _bother                  = bother;
+                _skipNextTalkOld         = bother._skipNextTalk;
+                _selectNextYesNoOld      = bother._selectNextYesNo;
+                _bother._skipNextTalk    = skipNextTalk;
+                _bother._selectNextYesNo = selectNextYesNo;
             }
 
             public void Dispose()

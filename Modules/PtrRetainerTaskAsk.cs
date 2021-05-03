@@ -1,5 +1,5 @@
 ﻿using System;
-using FFXIVClientStructs.Component.GUI;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace Peon.Modules
 {
@@ -21,13 +21,13 @@ namespace Peon.Modules
         public AtkComponentButton* ConfirmButton
             => (AtkComponentButton*) ((byte*) Pointer + ReturnOffset);
 
-        public AtkComponentButton* ReassignButton
+        public AtkComponentButton* AssignButton
             => (AtkComponentButton*) ((byte*) Pointer + AssignOffset);
 
         public void Return()
             => Module.ClickAddon(Pointer, ConfirmButton->AtkComponentBase.OwnerNode, EventType.Change, ReturnButtonId);
 
         public void Assign()
-            => Module.ClickAddon(Pointer, ReassignButton->AtkComponentBase.OwnerNode, EventType.Change, AssignButtonId);
+            => Module.ClickAddon(Pointer, AssignButton->AtkComponentBase.OwnerNode, EventType.Change, AssignButtonId);
     }
 }

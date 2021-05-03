@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Dalamud.Plugin;
-using FFXIVClientStructs.Component.GUI;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 using Peon.Modules;
 using Peon.SeFunctions;
 using Peon.Utility;
@@ -53,7 +53,7 @@ namespace Peon.Managers
         public PtrGrandCompanySupplyList   GrandCompanySupplyList()   => GetUiObject("GrandCompanySupplyList");
         public PtrGrandCompanySupplyReward GrandCompanySupplyReward() => GetUiObject("GrandCompanySupplyReward");
         public PtrHousingChocoboList       HousingChocoboList()       => GetUiObject("HousingChocoboList");
-        public PtrInventoryGrid            InventoryGrid(int idx)     => GetUiObject("InventoryGrid");
+        public PtrInventoryGrid            InventoryGrid(int idx)     => GetUiObject($"InventoryGrid{idx:D1}E");
         public PtrRecipeNote               RecipeNote()               => GetUiObject("RecipeNote");
         public PtrRetainerList             RetainerList()             => GetUiObject("RetainerList");
         public PtrRetainerTaskAsk          RetainerTaskAsk()          => GetUiObject("RetainerTaskAsk");
@@ -82,7 +82,7 @@ namespace Peon.Managers
             else
             {
                 var basePtr = (AtkUnitBase*) modulePtr.ToPointer();
-                if (basePtr->ULDData.LoadedState == 3 && (!info.RequiresVisible || basePtr->IsVisible))
+                if (basePtr->UldManager.LoadedState == 3 && (!info.RequiresVisible || basePtr->IsVisible))
                     return modulePtr;
             }
 
