@@ -1,14 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
-using System.Windows.Forms;
-using System.Xml.XPath;
-using Dalamud.Game;
 using Dalamud.Game.Command;
-using Dalamud.Game.Internal;
-using Dalamud.Hooking;
 using Dalamud.Plugin;
+using Peon.Gui;
 using Peon.Managers;
 using Peon.Modules;
 using Peon.SeFunctions;
@@ -16,41 +12,24 @@ using Peon.Utility;
 
 namespace Peon
 {
-    public class PeonWorker
-    {
-        private readonly DalamudPluginInterface _pluginInterface;
-        private readonly InterfaceManager       _interfaceManager;
-
-        public PeonWorker(DalamudPluginInterface pluginInterface, InterfaceManager interfaceManager)
-        {
-            _pluginInterface  = pluginInterface;
-            _interfaceManager = interfaceManager;
-        }
-
-        public bool TargetByName()
-        {
-            foreach (var actor in _pluginInterface.ClientState.Actors)
-            { }
-
-            return false;
-        }
-    }
-
     public class Peon : IDalamudPlugin
     {
+        public static string Version = "";
+
         public string Name
             => "Peon";
 
-        private DalamudPluginInterface? _pluginInterface;
-        private InterfaceManager?       _interfaceManager;
-        private PeonConfiguration?      _configuration;
-        private AddonWatcher?           _addons;
-        private BotherHelper?           _ohBother;
-        private InputManager?           _inputManager;
-        private TargetManager?          _targeting;
-        private RetainerManager?        _retainers;
-        private LoginManager?           _login;
-        private ChocoboManager?         _chocobos;
+        private DalamudPluginInterface _pluginInterface  = null!;
+        private Interface              _interface        = null!;
+        private InterfaceManager       _interfaceManager = null!;
+        private PeonConfiguration      _configuration    = null!;
+        private AddonWatcher           _addons           = null!;
+        private BotherHelper           _ohBother         = null!;
+        private InputManager           _inputManager     = null!;
+        private TargetManager          _targeting        = null!;
+        private RetainerManager        _retainers        = null!;
+        private LoginManager           _login            = null!;
+        private ChocoboManager         _chocobos         = null!;
 
         public static long BaseAddress;
 
@@ -73,8 +52,10 @@ namespace Peon
         {
             try
             {
+                Version          = Assembly.GetExecutingAssembly().GetName().Version.ToString();
                 _pluginInterface = pluginInterface;
                 _configuration   = _pluginInterface.GetPluginConfig() as PeonConfiguration ?? new PeonConfiguration();
+                _interface       = new Interface(_pluginInterface, _configuration);
                 SetupServices(_pluginInterface);
                 _interfaceManager = new InterfaceManager(pluginInterface);
                 _addons           = new AddonWatcher(pluginInterface);
@@ -105,6 +86,7 @@ namespace Peon
             _ohBother?.Dispose();
             _addons?.Dispose();
             _interfaceManager?.Dispose();
+            _interface.Dispose();
             _pluginInterface!.CommandManager.RemoveHandler("/peon");
             _pluginInterface!.Dispose();
         }
@@ -117,8 +99,12 @@ namespace Peon
         private unsafe void OnRetainer(string command, string arguments)
         {
             var argumentParts = arguments.Split(',');
-            if (argumentParts.Length < 1)
+            if (arguments == string.Empty || argumentParts.Length < 1)
+            {
+                _interface.SetVisible();
                 return;
+            }
+
             switch (argumentParts[0])
             {
                 case "cancel":
@@ -179,7 +165,8 @@ namespace Peon
                 case "retainer":
                     if (argumentParts.Length < 2)
                         return;
-                    _retainers!.DoSpecificRetainers(RetainerMode.ResendWithGil, argumentParts[1].Split(' ').Select( int.Parse ).ToArray());
+
+                    _retainers!.DoSpecificRetainers(RetainerMode.ResendWithGil, argumentParts[1].Split(' ').Select(int.Parse).ToArray());
                     break;
                 case "retainertest":
                     _interfaceManager.RetainerList().SelectFirstComplete();
@@ -187,11 +174,12 @@ namespace Peon
                 case "interact":
                     if (argumentParts.Length < 2)
                         return;
+
                     _targeting!.Interact(argumentParts[1], 300);
                     break;
                 case "timeout":
-                    _addons?.AddOneTime(AddonEvent.SelectYesNoSetup, 
-                        (ptrx, data) => PluginLog.Information($"{ptrx}"), 300, 
+                    _addons?.AddOneTime(AddonEvent.SelectYesNoSetup,
+                        (ptrx, data) => PluginLog.Information($"{ptrx}"), 300,
                         () => PluginLog.Information("timeout"));
                     break;
                 case "yes":
@@ -336,9 +324,7 @@ namespace Peon
                 case "bank":
                     var bank = _interfaceManager.Bank();
                     if (bank)
-                    {
                         bank.Minus();
-                    }
 
                     break;
                 case "feed":

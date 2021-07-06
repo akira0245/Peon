@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Dalamud.Plugin;
+using Peon.Bothers;
 using Peon.Modules;
 using Peon.Utility;
 

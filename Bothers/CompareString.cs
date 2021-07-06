@@ -1,9 +1,10 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 
-namespace Peon.Utility
+namespace Peon.Bothers
 {
     public enum MatchType : byte
     {
@@ -11,11 +12,15 @@ namespace Peon.Utility
         Contains,
         StartsWith,
         EndsWith,
+        CiEqual,
+        CiContains,
+        CiStartsWith,
+        CiEndsWith,
         RegexFull,
         RegexPartial,
     }
 
-    [StructLayout(LayoutKind.Explicit)]
+    [StructLayout(LayoutKind.Explicit, Pack = 1)]
     public struct CompareString
     {
         [FieldOffset(0)]
@@ -30,8 +35,8 @@ namespace Peon.Utility
 
         public CompareString(string text, MatchType type)
         {
-            _type  = type;
             _regex = null;
+            _type  = type;
             _text  = text;
             if (_type == MatchType.RegexFull || _type == MatchType.RegexPartial)
                 _regex = new Regex(text, RegexOptions.Compiled);
@@ -91,6 +96,10 @@ namespace Peon.Utility
                 MatchType.EndsWith     => text.EndsWith(_text),
                 MatchType.RegexFull    => FullRegexMatch(text),
                 MatchType.RegexPartial => _regex!.IsMatch(text),
+                MatchType.CiEqual      => string.Equals(text, _text, StringComparison.InvariantCultureIgnoreCase),
+                MatchType.CiContains   => text.ToLowerInvariant().Contains(_text.ToLowerInvariant()),
+                MatchType.CiStartsWith => text.StartsWith(_text, StringComparison.InvariantCultureIgnoreCase),
+                MatchType.CiEndsWith   => text.EndsWith(_text, StringComparison.InvariantCultureIgnoreCase),
                 _                      => throw new InvalidEnumArgumentException(),
             };
         }

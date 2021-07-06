@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Linq;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using Peon.Bothers;
 using Peon.Utility;
 
 namespace Peon.Modules
@@ -28,6 +30,9 @@ namespace Peon.Modules
         public string ItemText(int idx)
             => Module.TextNodeToString(Pointer->PopupMenu.List->ItemRendererList[idx]
                .AtkComponentListItemRenderer->AtkComponentButton.ButtonTextNode);
+
+        public string[] ItemTexts()
+            => Enumerable.Range(0, Count).Select(ItemText).ToArray();
 
         public bool Select(CompareString text)
             => Module.ClickList(&Pointer->PopupMenu.vtbl, Pointer->PopupMenu.List->AtkComponentBase.OwnerNode,
