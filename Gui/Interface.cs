@@ -1,14 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Reflection.Emit;
 using Dalamud.Interface;
 using Dalamud.Plugin;
 using GatherBuddy.Gui;
 using ImGuiNET;
 using Peon.Bothers;
-using Peon.Utility;
+using Peon.Crafting;
 
 namespace Peon.Gui
 {
@@ -20,6 +18,10 @@ namespace Peon.Gui
         private          bool   _visible = false;
         private readonly string _header;
 
+        private Macro? _currentMacro     = null;
+        private string _newMacroName     = string.Empty;
+        private string _newCharacterName = string.Empty;
+
         public Interface(DalamudPluginInterface pi, PeonConfiguration config)
         {
             _pluginInterface                          =  pi;
@@ -27,6 +29,8 @@ namespace Peon.Gui
             _pluginInterface.UiBuilder.OnBuildUi      += Draw;
             _pluginInterface.UiBuilder.OnOpenConfigUi += SetVisibleConfig;
             _header                                   =  Peon.Version.Length > 0 ? $"Peon v{Peon.Version}###PeonMain" : "Peon###PeonMain";
+            if (_config.CraftingMacros.Any())
+                _currentMacro = _config.CraftingMacros.Values.First();
         }
 
         public void SetVisible()
@@ -270,6 +274,129 @@ namespace Peon.Gui
             }
         }
 
+        private void DrawMacros()
+        {
+            using ImGuiRaii imgui = new();
+            if (!imgui.Begin(() => ImGui.BeginTabItem("Crafting Macros"), ImGui.EndTabItem))
+                return;
+
+            var macros = _config.CraftingMacros.Values.ToArray();
+            if (ImGui.BeginCombo("Current Macro", _currentMacro?.Name ?? ""))
+            {
+                foreach (var macro in _config.CraftingMacros)
+                    if (ImGui.Selectable(macro.Value.Name, macro.Value == _currentMacro))
+                        _currentMacro = macro.Value;
+                ImGui.EndCombo();
+            }
+
+            ImGui.InputTextWithHint("##NewMacro", "Enter new macro name...", ref _newMacroName, 64);
+            ImGui.SameLine();
+            if (ImGui.Button("New Macro"))
+                if (_newMacroName != string.Empty && !_config.CraftingMacros.ContainsKey(_newMacroName))
+                {
+                    _config.CraftingMacros.Add(_newMacroName, new Macro(_newMacroName));
+                    Save();
+                    _newMacroName = string.Empty;
+                }
+
+            if (_currentMacro == null)
+                return;
+
+            ImGui.SameLine();
+            ImGui.PushFont(UiBuilder.IconFont);
+            var deleteVal = ImGui.Button($"{FontAwesomeIcon.Trash.ToIconChar()}##deleteMacro");
+            ImGui.PopFont();
+            if (deleteVal)
+            {
+                _config.CraftingMacros.Remove(_currentMacro!.Name!);
+                Save();
+                _currentMacro = null;
+                return;
+            }
+
+            for (var i = 0; i < _currentMacro.Count; ++i)
+            {
+                ImGui.AlignTextToFramePadding();
+                ImGui.Text($"{i+1,3}. ");
+                ImGui.SameLine();
+                var currentName = _currentMacro.Actions[i].Use().Name;
+                if (ImGui.BeginCombo($"##action{i}", currentName, ImGuiComboFlags.NoArrowButton))
+                {
+                    foreach (var action in ActionIdExtensions.Actions.Values.Where(a => a.Id != ActionId.None))
+                        if (ImGui.Selectable($"{action.Name}##{i}", currentName == action.Name) && _currentMacro.Actions[i] != action.Id)
+                        {
+                            _currentMacro.Actions[i] = action.Id;
+                            Save();
+                        }
+
+                    ImGui.EndCombo();
+                }
+            }
+
+            ImGui.AlignTextToFramePadding();
+            ImGui.Text($"{_currentMacro.Count+1,3}. ");
+            ImGui.SameLine();
+            if (ImGui.BeginCombo($"##action{_currentMacro.Count}", "New Action", ImGuiComboFlags.NoArrowButton))
+            {
+                foreach (var action in ActionIdExtensions.Actions.Values.Where(a => a.Id != ActionId.None))
+                    if (ImGui.Selectable($"{action.Name}##{_currentMacro.Count}", false))
+                    {
+                        _currentMacro.Actions.Add(action.Id);
+                        Save();
+                    }
+
+                ImGui.EndCombo();
+            }
+        }
+
+        private void DrawLoginButtonConfig()
+        {
+            using ImGuiRaii imgui = new();
+            if (!imgui.Begin(() => ImGui.BeginTabItem("Login Buttons"), ImGui.EndTabItem))
+                return;
+
+            for (var i = 0; i < _config.CharacterNames.Count; ++i)
+            {
+                var name = _config.CharacterNames[i];
+                if (ImGui.InputText($"##Character{i}", ref name, 32) && name != _config.CharacterNames[i])
+                {
+                    if (!name.Any())
+                        _config.CharacterNames.RemoveAt(i);
+                    else
+                        _config.CharacterNames[i] = name;
+                    Save();
+                }
+            }
+
+            if (ImGui.InputTextWithHint($"##Character{_config.CharacterNames.Count}", "New Character...", ref _newCharacterName, 32, ImGuiInputTextFlags.EnterReturnsTrue) && _newCharacterName.Any() )
+            {
+                _config.CharacterNames.Add(_newCharacterName);
+                Save();
+                _newCharacterName = string.Empty;
+            }
+        }
+
+        private void DrawPeonConfig()
+        {
+            using ImGuiRaii imgui = new();
+            if (!imgui.Begin(() => ImGui.BeginTabItem("Config"), ImGui.EndTabItem))
+                return;
+
+            var enableBothers = _config.EnableNoBother;
+            if (ImGui.Checkbox("Enable Bothers", ref enableBothers) && enableBothers != _config.EnableNoBother)
+            {
+                _config.EnableNoBother = enableBothers;
+                Save();
+            }
+
+            var enableLoginButtons = _config.EnableLoginButtons;
+            if (ImGui.Checkbox("Enable Login Buttons", ref enableLoginButtons) && enableLoginButtons != _config.EnableLoginButtons)
+            {
+                _config.EnableLoginButtons = enableLoginButtons;
+                Save();
+            }
+        }
+
         private void Draw()
         {
             var minSize = new Vector2(640 * ImGui.GetIO().FontGlobalScale, ImGui.GetTextLineHeightWithSpacing() * 5);
@@ -284,9 +411,12 @@ namespace Peon.Gui
                 if (!imgui.Begin(() => ImGui.BeginTabBar("##Tabs"), ImGui.EndTabBar))
                     return;
 
+                DrawPeonConfig();
                 DrawTalkBothers();
                 DrawYesNoBothers();
                 DrawSelectBothers();
+                DrawMacros();
+                DrawLoginButtonConfig();
             }
             finally
             {

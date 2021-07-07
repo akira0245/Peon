@@ -12,13 +12,16 @@ namespace Peon.Managers
         None  = 0,
 
         // Retainer
-        RetainerListOpen       = 1,
-        RetainerMenuOpen       = 2,
-        RetainerBankOpen       = 3,
-        RetainerMenuOpenBank   = 5,
-        RetainerTaskResultOpen = 6,
-        RetainerTaskAskOpen    = 7,
-        RetainerMenuOpenDone   = 8,
+        RetainerListOpen             = 1,
+        RetainerMenuOpen             = 2,
+        RetainerBankOpen             = 3,
+        RetainerMenuOpenBank         = 5,
+        RetainerTaskResultOpen       = 6,
+        RetainerTaskAskOpen          = 7,
+        RetainerMenuOpenDone         = 8,
+        RetainerSelectCategoryOpen   = 9,
+        RetainerSelectLevelRangeOpen = 10,
+        RetainerTaskListOpen         = 11,
 
         // Stables
         ChocoboMenuOpen = 1,
@@ -61,7 +64,7 @@ namespace Peon.Managers
             }
             catch (OperationCanceledException)
             { }
-        } 
+        }
 
         protected void Wait(Task task)
             => task.Wait(CancelToken!.Token);
@@ -71,13 +74,13 @@ namespace Peon.Managers
 
         protected bool Failure(string text)
         {
-            State    = WorkState.Error;
+            State     = WorkState.Error;
             ErrorText = text;
             return false;
         }
 
         protected WorkManager(DalamudPluginInterface pluginInterface, TargetManager target, AddonWatcher addons, BotherHelper bothers,
-            InterfaceManager                         iManager)
+            InterfaceManager iManager)
         {
             Chat      = pluginInterface.Framework.Gui.Chat;
             Target    = target;
@@ -96,7 +99,7 @@ namespace Peon.Managers
 
             try
             {
-                State      = SetInitialState();
+                State       = SetInitialState();
                 _jobRunning = true;
                 CancelToken?.Dispose();
                 CancelToken = new CancellationTokenSource();
@@ -124,6 +127,7 @@ namespace Peon.Managers
                     {
                         stateHandler();
                     }
+
                 _jobRunning = false;
             }
             catch (Exception)

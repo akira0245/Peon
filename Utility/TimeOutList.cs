@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Dalamud.Plugin;
 
-namespace Peon.Managers
+namespace Peon.Utility
 {
     public class TimeOutList<TRet, TInfo> : IDisposable
     {

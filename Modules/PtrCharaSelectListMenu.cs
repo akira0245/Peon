@@ -1,5 +1,6 @@
 ﻿using System;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using Peon.Bothers;
 
 namespace Peon.Modules
 {
@@ -39,13 +40,14 @@ namespace Peon.Modules
             for (var i = 0; i < list->ListLength; ++i)
                 if (name == Module.TextNodeToString(list->ItemRendererList[i].AtkComponentListItemRenderer->AtkComponentButton.ButtonTextNode))
                     return i;
+
             return -1;
         }
 
         public bool Select(int idx)
             => Module.ClickList(Pointer, ListNode, idx, Value);
 
-        public bool Select(string name)
-            => Module.ClickList(Pointer, ListNode, a => Module.TextNodeToString(a->AtkComponentButton.ButtonTextNode) == name);
+        public bool Select(CompareString name)
+            => Module.ClickList(Pointer, ListNode, a => name.Matches(Module.TextNodeToString(a->AtkComponentButton.ButtonTextNode)), Value);
     }
 }

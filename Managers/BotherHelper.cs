@@ -15,6 +15,7 @@ namespace Peon.Managers
     {
         private readonly DalamudPluginInterface _pluginInterface;
         private readonly AddonWatcher           _addons;
+        private readonly PeonConfiguration      _config;
 
 
         private readonly List<ChoiceBotherSet> _bothersYesNo;
@@ -22,7 +23,6 @@ namespace Peon.Managers
         private readonly List<TalkBotherSet>   _bothersTalk;
         private readonly List<SelectBotherSet> _bothersSelect;
 
-        private readonly HashSet<string> _autoSkipSpeakerList = new();
         internal         bool            _skipNextTalk        = false;
         internal         bool?           _selectNextYesNo     = null;
 
@@ -58,6 +58,7 @@ namespace Peon.Managers
         {
             _pluginInterface = pluginInterface;
             _addons          = addons;
+            _config          = configuration;
             _bothersYesNo    = configuration.BothersYesNo;
             _bothersTalk     = configuration.BothersTalk;
             _bothersSelect   = configuration.BothersSelect;
@@ -77,6 +78,9 @@ namespace Peon.Managers
 
         private void OnSelectStringSetup(IntPtr ptr, IntPtr _)
         {
+            if (!_config.EnableNoBother)
+                return;
+
             PtrSelectString selectStringPtr = ptr;
             var             mainText        = selectStringPtr.Description();
             string[]?       texts           = null;
@@ -170,6 +174,9 @@ namespace Peon.Managers
 
         private void OnTalkUpdate(IntPtr ptr, IntPtr _)
         {
+            if (!_skipNextTalk && !_config.EnableNoBother)
+                return;
+
             PtrTalk talkPtr = ptr;
             var     speaker = talkPtr.Speaker();
             var     text    = talkPtr.Text();
@@ -212,8 +219,11 @@ namespace Peon.Managers
                 selectPtr.Click(_selectNextYesNo.Value);
                 return;
             }
-
             _selectNextYesNo = null;
+
+            if (!_config.EnableNoBother)
+                return;
+
             var stringPtr = *(void**) ((byte*) updateData.ToPointer() + 0x8);
             var text      = Marshal.PtrToStringAnsi(new IntPtr(stringPtr)) ?? string.Empty;
 

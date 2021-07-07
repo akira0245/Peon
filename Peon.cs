@@ -4,11 +4,13 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Dalamud.Game.Command;
 using Dalamud.Plugin;
+using Peon.Crafting;
 using Peon.Gui;
 using Peon.Managers;
 using Peon.Modules;
 using Peon.SeFunctions;
 using Peon.Utility;
+using CommandManager = Peon.Managers.CommandManager;
 
 namespace Peon
 {
@@ -30,9 +32,18 @@ namespace Peon
         private RetainerManager        _retainers        = null!;
         private LoginManager           _login            = null!;
         private ChocoboManager         _chocobos         = null!;
+        private CommandManager         _commands         = null!;
+        private Crafter                _crafter          = null!;
+        private LoginBar               _loginBar         = null!;
 
         public static long BaseAddress;
 
+
+        private void Print(string s)
+            => _pluginInterface.Framework.Gui.Chat.Print(s);
+
+        private void Error(string s)
+            => _pluginInterface.Framework.Gui.Chat.PrintError(s);
 
         public void SetupServices(DalamudPluginInterface pluginInterface)
         {
@@ -63,16 +74,33 @@ namespace Peon
                 _targeting        = new TargetManager(pluginInterface, _inputManager, _addons);
                 _ohBother         = new BotherHelper(_pluginInterface, _addons, _configuration);
                 _retainers        = new RetainerManager(_pluginInterface, _targeting, _addons!, _ohBother, _interfaceManager!);
-                _login            = new LoginManager(_pluginInterface, _ohBother, _interfaceManager!, _inputManager!);
+                _login            = new LoginManager(_pluginInterface, _ohBother, _interfaceManager!);
                 _chocobos         = new ChocoboManager(_pluginInterface, _targeting, _addons, _ohBother, _interfaceManager);
+                _commands         = new CommandManager(_pluginInterface);
+                _crafter          = new Crafter(_pluginInterface, _configuration, _commands, _interfaceManager, false);
                 BaseAddress       = _pluginInterface.TargetModuleScanner.Module.BaseAddress.ToInt64();
+                _loginBar         = new LoginBar(_pluginInterface, _configuration, _login, _interfaceManager);
 
                 _pluginInterface.SavePluginConfig(_configuration);
 
-                _pluginInterface.CommandManager.AddHandler("/peon", new CommandInfo(OnRetainer)
+                _pluginInterface.CommandManager.AddHandler("/retainer", new CommandInfo(OnRetainer)
                 {
                     HelpMessage = "Send Retainers, either 'all' or a comma-separated list of indices.",
                     ShowInHelp  = true,
+                });
+
+                _pluginInterface.CommandManager.AddHandler("/login", new CommandInfo(OnLogin)
+                {
+                    HelpMessage =
+                        "Log from your current character to another character on the same server. Use \"/login next\" or \"/login previous\" to log to the next or previous character in the list.",
+                    ShowInHelp = true,
+                });
+
+                _pluginInterface.CommandManager.AddHandler("/craft", new CommandInfo(OnCraft)
+                {
+                    HelpMessage =
+                        "Log from your current character to another character on the same server. Use \"/login next\" or \"/login previous\" to log to the next or previous character in the list.",
+                    ShowInHelp = true,
                 });
             }
             catch (Exception e)
@@ -83,17 +111,102 @@ namespace Peon
 
         public void Dispose()
         {
-            _ohBother?.Dispose();
-            _addons?.Dispose();
-            _interfaceManager?.Dispose();
+            _loginBar.Dispose();
+            _ohBother.Dispose();
+            _addons.Dispose();
+            _interfaceManager.Dispose();
             _interface.Dispose();
+            _pluginInterface!.CommandManager.RemoveHandler("/retainer");
             _pluginInterface!.CommandManager.RemoveHandler("/peon");
+            _pluginInterface!.CommandManager.RemoveHandler("/login");
+            _pluginInterface!.CommandManager.RemoveHandler("/craft");
             _pluginInterface!.Dispose();
         }
 
-        private void DoRetainer(int idx)
+        //private void OnRetainer(string command, string arguments)
+        //{
+        //    if (arguments == string.Empty)
+        //    {
+        //        Print("Use with [all|miner|botanist|fisher|hunter|gatherer|name].");
+        //    }
+        //    var argumentParts = arguments.ToLowerInvariant().Split();
+        //
+        //    switch (argumentParts[0])
+        //    {
+        //        case "all":
+        //        case "miner":
+        //        case "botanist":
+        //        case "fisher":
+        //        case "hunter":
+        //    }
+        //
+        //}
+
+        private void OnCraft(string command, string arguments)
         {
-            ;
+            if (!arguments.Any())
+            {
+                Print("Please use with <MacroName>(, Amount).");
+                return;
+            }
+
+            if (arguments == "cancel")
+            {
+                _crafter.Cancel();
+                return;
+            }
+
+            var split = arguments.Split(',');
+
+            if (!_configuration.CraftingMacros.TryGetValue(split[0], out var macro))
+            {
+                Print($"{arguments} is not a valid macro name.");
+                return;
+            }
+
+            var amount = 1;
+            if (split.Length == 2)
+            {
+                if (!int.TryParse(split[1].Trim(), out amount))
+                {
+                    amount = 1;
+                    Print($"{split[1].Trim()} is not an integer, set amount to 1.");
+                }
+                else
+                {
+                    amount = Math.Max(amount, 1);
+                }
+            }
+
+            Task.Run(async () =>
+            {
+                for (var i = 0; i < amount; ++i)
+                {
+                    _crafter.RestartCraft();
+                    await _crafter.CompleteCraft(macro);
+                }
+            });
+        }
+
+        private unsafe void OnLogin(string command, string arguments)
+        {
+            const int defaultTimeOut = 10000;
+            switch (arguments)
+            {
+                case "":
+                    Print("Use with a (partial) character name, \"next\", or \"previous\".");
+                    return;
+                case "next":
+                    _login.NextCharacter(defaultTimeOut);
+                    return;
+                case "previous":
+                case "prev":
+                    _login.PreviousCharacter(defaultTimeOut);
+                    return;
+                default:
+                    _login.LogTo(arguments, defaultTimeOut);
+                    return;
+            }
         }
 
         private unsafe void OnRetainer(string command, string arguments)
@@ -109,22 +222,6 @@ namespace Peon
             {
                 case "cancel":
                     _retainers!.Cancel();
-                    break;
-                case "turnin":
-                    Task.Run(() =>
-                    {
-                        var ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("GrandCompanySupplyList", 1);
-                        if (ptr != IntPtr.Zero)
-                        {
-                            PtrGrandCompanySupplyList s = ptr;
-                            s.Select(0);
-                            var task = _interfaceManager.Add("GrandCompanySupplyReward", true, 3000);
-                            task.SafeWait();
-                            if (!task.IsCanceled)
-                                ((PtrGrandCompanySupplyReward) task.Result).Deliver();
-                        }
-                    });
-
                     break;
                 case "allturnin":
                     Task.Run(() =>
@@ -145,7 +242,7 @@ namespace Peon
                                     return;
 
                                 ((PtrGrandCompanySupplyReward) task.Result).Deliver();
-                                Task.Delay(50).Wait();
+                                Task.Delay(75).Wait();
                                 task = _interfaceManager.Add("GrandCompanySupplyList", false, 3000);
                                 task.SafeWait();
                                 if (task.IsCanceled)
@@ -156,9 +253,7 @@ namespace Peon
                         });
                     });
                     break;
-                case "logout":
-                    _login!.NextCharacter(5000);
-                    break;
+
                 case "allretainer":
                     _retainers!.DoAllRetainers(RetainerMode.ResendWithGil);
                     break;
@@ -168,153 +263,28 @@ namespace Peon
 
                     _retainers!.DoSpecificRetainers(RetainerMode.ResendWithGil, argumentParts[1].Split(' ').Select(int.Parse).ToArray());
                     break;
-                case "retainertest":
-                    _interfaceManager.RetainerList().SelectFirstComplete();
+                case "test":
+                    _retainers.SpecificRetainerNewVenture(5, 2, 1, 4);
                     break;
-                case "interact":
+                case "identify":
                     if (argumentParts.Length < 2)
                         return;
 
-                    _targeting!.Interact(argumentParts[1], 300);
-                    break;
-                case "timeout":
-                    _addons?.AddOneTime(AddonEvent.SelectYesNoSetup,
-                        (ptrx, data) => PluginLog.Information($"{ptrx}"), 300,
-                        () => PluginLog.Information("timeout"));
-                    break;
-                case "yes":
-                    var ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("SelectYesno", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrSelectYesno s = ptr;
-                        s.ClickYes();
-                    }
-
-                    break;
-                case "no":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("SelectYesno", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrSelectYesno s = ptr;
-                        s.ClickNo();
-                    }
-
+                    _retainers.Identifier.Identify(argumentParts[1], RetainerJob.Botanist, out var info);
+                    Print($"Botanist {info.Category} {info.LevelRange}, {info.Item}");
+                    _retainers.Identifier.Identify(argumentParts[1], RetainerJob.Miner, out info);
+                    Print($"Miner {info.Category} {info.LevelRange}, {info.Item}");
+                    _retainers.Identifier.Identify(argumentParts[1], RetainerJob.Fisher, out info);
+                    Print($"Fisher {info.Category} {info.LevelRange}, {info.Item}");
+                    _retainers.Identifier.Identify(argumentParts[1], RetainerJob.Hunter, out info);
+                    Print($"Hunter {info.Category} {info.LevelRange}, {info.Item}");
                     break;
                 case "synthesize":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("RecipeNote", 1);
+                    var ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("RecipeNote", 1);
                     if (ptr != IntPtr.Zero)
                     {
                         PtrRecipeNote s = ptr;
                         s.Synthesize();
-                    }
-
-                    break;
-                case "list1":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("SelectString", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrSelectString s = ptr;
-                        s.Select(0);
-                    }
-
-                    break;
-                case "list2":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("SelectString", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrSelectString s = ptr;
-                        s.Select(1);
-                    }
-
-                    break;
-                case "talk":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("Talk", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrTalk s = ptr;
-                        if (s.Pointer->AtkUnitBase.IsVisible)
-                            s.Click();
-                    }
-
-                    break;
-                case "retainer1":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("RetainerList", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrRetainerList s = ptr;
-                        s.Select(0);
-                    }
-
-                    break;
-                case "retainer2":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("RetainerList", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrRetainerList s = ptr;
-                        s.Select(1);
-                    }
-
-                    break;
-                case "confirm":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("RetainerTaskResult", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrRetainerTaskResult s = ptr;
-                        s.Confirm();
-                    }
-
-                    break;
-                case "reassign":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("RetainerTaskResult", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrRetainerTaskResult s = ptr;
-                        s.Reassign();
-                    }
-
-                    break;
-                case "return":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("RetainerTaskAsk", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrRetainerTaskAsk s = ptr;
-                        s.Return();
-                    }
-
-                    break;
-                case "assign":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("RetainerTaskAsk", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrRetainerTaskAsk s = ptr;
-                        s.Assign();
-                    }
-
-                    break;
-                case "quit":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("SystemMenu", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrSelectString s = ptr;
-                        s.Select(10);
-                    }
-
-                    break;
-                case "start":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("_TitleMenu", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrTitleMenu s = ptr;
-                        s.Start();
-                    }
-
-                    break;
-                case "select":
-                    ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("_CharaSelectListMenu", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrCharaSelectListMenu s = ptr;
-                        s.Select(4);
                     }
 
                     break;

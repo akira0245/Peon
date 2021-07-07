@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Dalamud.Plugin;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
@@ -47,7 +48,14 @@ namespace Peon.Modules
             }
 
             public void Dispose()
-                => Marshal.FreeHGlobal(new IntPtr(Data));
+            {
+                var ptr = new IntPtr(Data);
+                Task.Run(() =>
+                {
+                    Task.Delay(10000).Wait();
+                    Marshal.FreeHGlobal(ptr);
+                });
+            }
         }
 
         public readonly struct EventData : IDisposable

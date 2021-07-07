@@ -11,70 +11,104 @@ namespace Peon.Managers
     {
         private readonly DalamudPluginInterface _pluginInterface;
         private readonly InterfaceManager       _interfaceManager;
-        private readonly InputManager           _inputManager;
         private readonly BotherHelper           _botherHelper;
         private          string                 _lastCharacterName = "";
         private          string[]?              _characters;
-        private          bool                   _canceled = false;
+        private          bool                   _running = false;
 
-        public LoginManager(DalamudPluginInterface pluginInterface, BotherHelper botherHelper, InterfaceManager interfaceManager, InputManager inputManager)
+        public LoginManager(DalamudPluginInterface pluginInterface, BotherHelper botherHelper, InterfaceManager interfaceManager)
         {
             _pluginInterface  = pluginInterface;
-            _inputManager     = inputManager;
             _interfaceManager = interfaceManager;
             _botherHelper     = botherHelper;
         }
 
-        public void NextCharacter(int timeout)
+        private void CharacterTask(int timeout, Action<IntPtr> action)
         {
-            _canceled          = false;
-            _lastCharacterName = _pluginInterface.ClientState.LocalPlayer?.Name ?? "";
+            if (_running)
+            {
+                _pluginInterface.Framework.Gui.Chat.PrintError($"Character Task already running.");
+                return;
+            }
+
+            _running = true;
             Task.Run(() =>
             {
                 var ptr = LogOut(timeout);
-                if (ptr == IntPtr.Zero || _canceled)
+                if (ptr == IntPtr.Zero || !_running)
+                {
+                    _running = false;
                     return;
+                }
+
                 ptr = ClickStart(ptr);
-                if (ptr == IntPtr.Zero || _canceled)
+                if (ptr == IntPtr.Zero || !_running)
+                {
+                    _running = false;
                     return;
+                }
 
                 Task.Delay(500).Wait();
-                NextCharacter(ptr);
+                action(ptr);
+                _running = false;
             });
         }
 
+        public void NextCharacter(int timeout)
+        {
+            _lastCharacterName = _pluginInterface.ClientState.LocalPlayer?.Name ?? "";
+            CharacterTask(timeout, ptr => NextCharacterIntern(ptr, false));
+        }
+
+        public void PreviousCharacter(int timeout)
+        {
+            _lastCharacterName = _pluginInterface.ClientState.LocalPlayer?.Name ?? "";
+            CharacterTask(timeout, ptr => NextCharacterIntern(ptr, true));
+        }
+
+        public void LogTo(string character, int timeout)
+            => CharacterTask(timeout, ptr => SpecificCharacter(character, ptr));
+
+        public void LogTo(int idx, int timeout)
+            => CharacterTask(timeout, ptr => SpecificCharacter(idx, ptr));
+
         public void Cancel()
-            => _canceled = true;
+            => _running = false;
 
         public void Reset()
         {
+            _running    = false;
             _characters = null;
         }
 
         private IntPtr LogOut(int timeout)
         {
-            var task = _interfaceManager.Add("_MainCommand", true, timeout);
-            task.SafeWait();
-            if (task.IsCanceled)
-                return IntPtr.Zero;
+            if (_pluginInterface.ClientState.Condition.Any())
+            {
+                var task = _interfaceManager.Add("_MainCommand", true, timeout);
+                task.SafeWait();
+                if (task.IsCanceled)
+                    return IntPtr.Zero;
 
-            PtrMainCommand main = task.Result;
-            main.System();
+                PtrMainCommand main = task.Result;
+                main.System();
 
-            task = _interfaceManager.Add("AddonContextMenuTitle", true, timeout);
-            task.SafeWait();
-            if (task.IsCanceled)
-                return IntPtr.Zero;
-            
-            using var nextYesno = _botherHelper.SelectNextYesNo(true);
-            PtrContextMenuTitle menu      = task.Result;
-            if (!menu.Select(new CompareString("Log Out", MatchType.Equal)))
-                return IntPtr.Zero;
+                task = _interfaceManager.Add("AddonContextMenuTitle", true, timeout);
+                task.SafeWait();
+                if (task.IsCanceled)
+                    return IntPtr.Zero;
 
-            task = _interfaceManager.Add("_TitleMenu", true, timeout);
-            task.SafeWait();
-            return task.IsCanceled ? IntPtr.Zero : task.Result;
+                using var           nextYesno = _botherHelper.SelectNextYesNo(true);
+                PtrContextMenuTitle menu      = task.Result;
+                if (!menu.Select(new CompareString("Log Out", MatchType.Equal)))
+                    return IntPtr.Zero;
+            }
+
+            var titleTask = _interfaceManager.Add("_TitleMenu", true, timeout);
+            titleTask.SafeWait();
+            return titleTask.IsCanceled ? IntPtr.Zero : titleTask.Result;
         }
+
         private IntPtr ClickStart(IntPtr titleMenu)
         {
             PtrTitleMenu menu = titleMenu;
@@ -84,7 +118,7 @@ namespace Peon.Managers
             return task.IsCanceled ? IntPtr.Zero : task.Result;
         }
 
-        private bool NextCharacter(IntPtr charaSelect)
+        private bool NextCharacterIntern(IntPtr charaSelect, bool previous)
         {
             PtrCharaSelectListMenu chara = charaSelect;
             _characters ??= chara.CharacterNames();
@@ -93,7 +127,7 @@ namespace Peon.Managers
                 return false;
 
             var idx = Array.IndexOf(_characters, _lastCharacterName);
-            idx = (idx + 1) % _characters.Length;
+            idx = (idx + (previous ? -1 : 1)) % _characters.Length;
 
             return chara.Select(idx);
         }
@@ -101,7 +135,13 @@ namespace Peon.Managers
         private bool SpecificCharacter(string character, IntPtr charaSelect)
         {
             PtrCharaSelectListMenu chara = charaSelect;
-            return chara.Select(character);
+            return chara.Select(new CompareString(character, MatchType.CiContains));
+        }
+
+        private bool SpecificCharacter(int idx, IntPtr charaSelect)
+        {
+            PtrCharaSelectListMenu chara = charaSelect;
+            return chara.Select(idx);
         }
     }
 }

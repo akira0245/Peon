@@ -11,9 +11,10 @@ namespace Peon.Managers
 {
     public struct ModuleInfo
     {
-        public string Name;
-        public bool   RequiresVisible;
-        public bool   Inverted;
+        public string              Name;
+        public Func<IntPtr, bool>? Predicate;
+        public bool                RequiresVisible;
+        public bool                Inverted;
     }
 
     public sealed class InterfaceManager : TimeOutList<IntPtr, ModuleInfo>
@@ -41,11 +42,22 @@ namespace Peon.Managers
             return IntPtr.Zero;
         }
 
-        public Task<IntPtr> Add(string name, bool requiresVisible, int timeOutMs)
-            => Add(new ModuleInfo{ Name = name, RequiresVisible = requiresVisible, Inverted = false }, timeOutMs);
+        public Task<IntPtr> Add(string name, bool requiresVisible, int timeOutMs, Func<IntPtr, bool>? predicate = null)
+            => Add(new ModuleInfo
+            {
+                Name            = name,
+                RequiresVisible = requiresVisible,
+                Inverted        = false,
+                Predicate       = predicate,
+            }, timeOutMs);
 
         public Task<IntPtr> AddInverted(string name, bool requiresVisible, int timeOutMs)
-            => Add(new ModuleInfo{ Name = name, RequiresVisible = requiresVisible, Inverted = true }, timeOutMs);
+            => Add(new ModuleInfo
+            {
+                Name            = name,
+                RequiresVisible = requiresVisible,
+                Inverted        = true,
+            }, timeOutMs);
 
         // @formatter:off
         public PtrBank                     Bank()                     => GetUiObject("Bank");
@@ -57,9 +69,11 @@ namespace Peon.Managers
         public PtrRecipeNote               RecipeNote()               => GetUiObject("RecipeNote");
         public PtrRetainerList             RetainerList()             => GetUiObject("RetainerList");
         public PtrRetainerTaskAsk          RetainerTaskAsk()          => GetUiObject("RetainerTaskAsk");
+        public PtrRetainerTaskList         RetainerTaskList()         => GetUiObject("RetainerTaskList");
         public PtrRetainerTaskResult       RetainerTaskResult()       => GetUiObject("RetainerTaskResult");
         public PtrSelectString             SelectString()             => GetUiObject("SelectString");
         public PtrSelectYesno              SelectYesno()              => GetUiObject("SelectYesno");
+        public PtrSynthesis                Synthesis()                => GetUiObject("Synthesis");
         public PtrSelectString             SystemMenu()               => GetUiObject("SystemMenu");
         public PtrTalk                     Talk()                     => GetUiObject("Talk");
         public PtrTextError                TextError()                => GetUiObject("_TextError");
@@ -77,12 +91,13 @@ namespace Peon.Managers
                 var basePtr = (AtkUnitBase*) modulePtr.ToPointer();
                 if (info.RequiresVisible && !basePtr->IsVisible)
                     return IntPtr.Zero;
+
                 return modulePtr;
             }
             else
             {
                 var basePtr = (AtkUnitBase*) modulePtr.ToPointer();
-                if (basePtr->UldManager.LoadedState == 3 && (!info.RequiresVisible || basePtr->IsVisible))
+                if (basePtr->UldManager.LoadedState == 3 && (!info.RequiresVisible || basePtr->IsVisible) && (info.Predicate?.Invoke(modulePtr) ?? true))
                     return modulePtr;
             }
 
