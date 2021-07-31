@@ -86,7 +86,14 @@ namespace Peon.Modules
             }
 
             public void Dispose()
-                => Marshal.FreeHGlobal(new IntPtr(Data));
+            {
+                var ptr = new IntPtr(Data);
+                Task.Run(() =>
+                {
+                    Task.Delay(10000).Wait();
+                    Marshal.FreeHGlobal(ptr);
+                });
+            }
 
             public static EventData CreateEmpty()
                 => new(null, 0);

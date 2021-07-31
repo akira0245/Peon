@@ -3,6 +3,8 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
+using Peon.Crafting;
+using Peon.Utility;
 
 namespace Peon.Bothers
 {
@@ -41,6 +43,10 @@ namespace Peon.Bothers
             if (_type == MatchType.RegexFull || _type == MatchType.RegexPartial)
                 _regex = new Regex(text, RegexOptions.Compiled);
         }
+
+        public CompareString(StringId id)
+            :this(id.Value(), MatchType.Equal)
+        { }
 
         public string Text
         {

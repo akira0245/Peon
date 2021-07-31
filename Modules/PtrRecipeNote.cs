@@ -17,5 +17,11 @@ namespace Peon.Modules
 
         public void Synthesize()
             => Module.ClickAddon(Pointer, Pointer->SynthesizeButton->AtkComponentBase.OwnerNode, EventType.Change, SynthesizeButtonId);
+
+        public void ClickJob(int which)
+        {
+            var radioButtonNode = Pointer->AtkUnitBase.UldManager.NodeList[97 - which];
+            Module.ClickAddon(Pointer, radioButtonNode, EventType.Change, 1);
+        }
     }
 }

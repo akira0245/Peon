@@ -15,7 +15,6 @@ namespace Peon.Managers
     {
         SelectYesNoSetup,
         SelectStringSetup,
-        RetainerListSetup,
 
         TalkUpdate,
 
@@ -44,10 +43,10 @@ namespace Peon.Managers
         public AddonWatcher(DalamudPluginInterface pluginInterface)
             : base(pluginInterface)
         {
-            _onSelectYesnoSetupHook  = Service<YesNoOnSetup>.Get().CreateHook(OnSelectYesNoSetupDetour, this);
-            _onSelectStringSetupHook = Service<SelectStringOnSetup>.Get().CreateHook(OnSelectStringSetupDetour, this);
-            _onTalkUpdateHook        = Service<TalkOnUpdate>.Get().CreateHook(OnTalkUpdateDetour, this);
-            _onTextErrorChangeHook   = Service<TextErrorOnChange>.Get().CreateHook(OnTextErrorChangeDetour, this);
+            _onSelectYesnoSetupHook  = Service<YesNoOnSetup>.Get().CreateHook(OnSelectYesNoSetupDetour);
+            _onSelectStringSetupHook = Service<SelectStringOnSetup>.Get().CreateHook(OnSelectStringSetupDetour);
+            _onTalkUpdateHook        = Service<TalkOnUpdate>.Get().CreateHook(OnTalkUpdateDetour);
+            _onTextErrorChangeHook   = Service<TextErrorOnChange>.Get().CreateHook(OnTextErrorChangeDetour);
         }
 
         public ref OnAddonEventDelegate? this[AddonEvent addonEvent]
@@ -66,7 +65,7 @@ namespace Peon.Managers
         }
 
         public void Add(AddonEvent addonEvent, OnAddonEventDelegate eventHandler, int timeOutFrames,
-            OnAddonEventTimeOut?   timeOutHandler)
+            OnAddonEventTimeOut? timeOutHandler)
         {
             Add(new AddonEventInfo
             {
@@ -78,7 +77,7 @@ namespace Peon.Managers
         }
 
         public void AddOneTime(AddonEvent addonEvent, OnAddonEventDelegate eventHandler, int timeOutFrames,
-            OnAddonEventTimeOut?   timeOutHandler)
+            OnAddonEventTimeOut? timeOutHandler)
         {
             void Indirection(IntPtr pluginPtr, IntPtr dataPtr)
             {

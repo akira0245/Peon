@@ -2,6 +2,7 @@
 using Dalamud.Plugin;
 using FFXIVClientStructs.FFXIV.Client.Graphics;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using Peon.Crafting;
 using Peon.Utility;
 
 namespace Peon.Modules
@@ -17,10 +18,10 @@ namespace Peon.Modules
             => ptr.Pointer != null;
 
         private AtkComponentNode* StableListNode
-            => (AtkComponentNode*) Pointer->RootNode->ChildNode->PrevSiblingNode->PrevSiblingNode->PrevSiblingNode;
+            => (AtkComponentNode*) Pointer->UldManager.NodeList[20];
 
         private AtkComponentNode* ChocoboListNode
-            => (AtkComponentNode*) Pointer->RootNode->ChildNode->PrevSiblingNode->ChildNode->PrevSiblingNode->PrevSiblingNode->PrevSiblingNode;
+            => (AtkComponentNode*) Pointer->UldManager.NodeList[6];
 
         private bool SelectStable(int idx)
             => Module.ClickList(Pointer, StableListNode, idx, 2);
@@ -28,44 +29,26 @@ namespace Peon.Modules
         private bool SelectChocobo(int idx)
             => Module.ClickList(Pointer, ChocoboListNode, idx, 3);
 
+        public int ChocoboCount
+            => ((AtkComponentList*) ChocoboListNode->Component)->ListLength;
 
-        private bool IsMaxLevelColor(ByteColor color)
-            => color.R == 0xFF && color.G == 0xC5 && color.B == 0xE1 && color.A == 0xAA;
+        public int StableCount
+            => ((AtkComponentList*) StableListNode->Component)->ListLength;
 
-        private bool TrainableChocobo(AtkComponentListItemRenderer* renderer)
+        private static bool IsMaxLevelColor(ByteColor color)
+            => color.R == 0xF0 && color.G == 0x8E && color.B == 0x37 && color.A == 0xFF;
+
+        private static bool TrainableChocobo(AtkComponentListItemRenderer* renderer)
         {
-            
-            var rootNode   = renderer->AtkComponentButton.AtkComponentBase.UldManager.RootNode;
-            var res1       = rootNode->PrevSiblingNode->PrevSiblingNode->PrevSiblingNode->ChildNode->PrevSiblingNode;
-            var statusTextNode = (AtkTextNode*) res1->ChildNode->PrevSiblingNode;
-            var s = Module.TextNodeToString(statusTextNode);
-            if (s != "Ready")
+            var uld = ((AtkComponentBase*) renderer)->UldManager;
+            if (!StringId.ChocoboIsReady.Equal(Module.TextNodeToString((AtkTextNode*) uld.NodeList[7])))
                 return false;
 
-            var levelTextNode = (AtkTextNode*) res1->PrevSiblingNode->PrevSiblingNode->PrevSiblingNode->PrevSiblingNode->ChildNode->PrevSiblingNode;
-            return !IsMaxLevelColor(levelTextNode->TextColor);
+            return !IsMaxLevelColor(((AtkTextNode*) uld.NodeList[11]->ChildNode->PrevSiblingNode)->TextColor);
         }
 
         public bool SelectNextTrainableChocobo()
-        {
-            var list      = ChocoboListNode;
-            var component = (AtkComponentList*) list->Component;
-
-            // List is sometimes not up at the same time as module,
-            // and buttons return errors even if they are setup correctly, thus the long wait.
-            TaskExtension.WaitUntil(() => component->ItemRendererList != null, 5000, 1000);
-            if (component->ItemRendererList == null)
-                return false;
-
-            for (var i = 0; i < component->ListLength; ++i)
-            {
-                var renderer = component->ItemRendererList[i].AtkComponentListItemRenderer;
-                if (TrainableChocobo(renderer)) 
-                    return Module.ClickList(Pointer, ChocoboListNode, i, 3);
-            }
-
-            return false;
-        }
+            => Module.ClickList(Pointer, ChocoboListNode, TrainableChocobo, 3);
 
         public bool Select(int idx)
             => SelectChocobo(idx % 15);

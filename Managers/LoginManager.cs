@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Dalamud.Plugin;
 using Peon.Bothers;
+using Peon.Crafting;
 using Peon.Modules;
 using Peon.Utility;
 
@@ -83,11 +84,12 @@ namespace Peon.Managers
 
         private IntPtr LogOut(int timeout)
         {
+            using var nextYesno = _botherHelper.SelectNextYesNo(true);
             if (_pluginInterface.ClientState.Condition.Any())
             {
                 var task = _interfaceManager.Add("_MainCommand", true, timeout);
                 task.SafeWait();
-                if (task.IsCanceled)
+                if (task.IsCanceled || task.Result == IntPtr.Zero)
                     return IntPtr.Zero;
 
                 PtrMainCommand main = task.Result;
@@ -95,12 +97,11 @@ namespace Peon.Managers
 
                 task = _interfaceManager.Add("AddonContextMenuTitle", true, timeout);
                 task.SafeWait();
-                if (task.IsCanceled)
+                if (task.IsCanceled || task.Result == IntPtr.Zero)
                     return IntPtr.Zero;
 
-                using var           nextYesno = _botherHelper.SelectNextYesNo(true);
-                PtrContextMenuTitle menu      = task.Result;
-                if (!menu.Select(new CompareString("Log Out", MatchType.Equal)))
+                PtrContextMenuTitle menu = task.Result;
+                if (!menu.Select(StringId.LogOut.Cs()))
                     return IntPtr.Zero;
             }
 

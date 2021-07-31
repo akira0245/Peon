@@ -1,10 +1,8 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Plugin;
-using Peon.Bothers;
 using Peon.Modules;
 using Peon.Utility;
 
@@ -12,8 +10,9 @@ namespace Peon.Managers
 {
     public class ChocoboManager : WorkManager
     {
+        private const int StableDelay = 500;
         public ChocoboManager(DalamudPluginInterface pluginInterface, TargetManager target, AddonWatcher addons, BotherHelper bothers,
-            InterfaceManager                         iManager)
+            InterfaceManager iManager)
             : base(pluginInterface, target, addons, bothers, iManager)
         { }
 
@@ -24,7 +23,7 @@ namespace Peon.Managers
         protected override WorkState SetInitialState()
         {
             _chocoboMenu = Interface.SelectString();
-            if (_chocoboMenu)
+            if (_chocoboMenu && _chocoboMenu.Description().Contains(StringId.ChocobosStabled.Value()))
                 return WorkState.ChocoboMenuOpen;
 
             _stable = Interface.HousingChocoboList();
@@ -39,7 +38,6 @@ namespace Peon.Managers
             _inventory[2] = Interface.InventoryGrid(2);
             _inventory[3] = Interface.InventoryGrid(3);
             return WorkState.InventoryOpen;
-
         }
 
         public void FeedAllChocobos()
@@ -54,28 +52,29 @@ namespace Peon.Managers
                 WorkState.StablesClean    => OpenStables(),
                 WorkState.StablesOpen     => ContactChocobo(),
                 WorkState.InventoryOpen   => FeedChocobo(),
-                _                         => throw new InvalidEnumArgumentException()
+                _                         => throw new InvalidEnumArgumentException(),
             };
         }
 
         private bool ContactStables()
         {
-            var task = Interface.Add("SelectString", false, DefaultTimeOut);
+            var task = Interface.Add("SelectString", true, DefaultTimeOut,
+                ptr => ((PtrSelectString) ptr).Description().Contains(StringId.ChocobosStabled.Value()));
             if (task.IsCompleted)
             {
                 _chocoboMenu = task.Result;
-                State       = WorkState.ChocoboMenuOpen;
+                State        = WorkState.ChocoboMenuOpen;
                 return true;
             }
 
-            var targetTask = Target.Interact("Chocobo Stable", DefaultTimeOut / 6);
+            var targetTask = Target.Interact(StringId.ChocoboStable.Value(), DefaultTimeOut / 6);
 
             Wait(targetTask);
             switch (targetTask.IsCompleted ? targetTask.Result : TargetingState.TimeOut)
             {
                 case TargetingState.ActorNotFound:   return Failure("No chocobo stable in the vicinity.");
                 case TargetingState.ActorNotInRange: return Failure("Too far away from chocobo stable.");
-                case TargetingState.TimeOut:         
+                case TargetingState.TimeOut:
                 case TargetingState.Unknown:
                     return Failure("Unknown error.");
             }
@@ -84,57 +83,82 @@ namespace Peon.Managers
             if (!task.IsCompleted || task.Result == IntPtr.Zero)
                 return Failure("Could not open Chocobo Menu.");
 
-            State       = WorkState.ChocoboMenuOpen;
+            State        = WorkState.ChocoboMenuOpen;
             _chocoboMenu = task.Result;
             return true;
         }
 
-        private bool OpenStables()
+        private unsafe bool OpenStables()
         {
-            var task = Interface.Add("HousingChocoboList", false, DefaultTimeOut);
-            _chocoboMenu.Select(new CompareString("Tend to a Specified Chocobo", MatchType.Equal));
+            _chocoboMenu.Select(StringId.TendChocobo.Cs());
+
+            var task = Interface.Add("HousingChocoboList", true, DefaultTimeOut, ptr => ((PtrHousingChocoboList) ptr).ChocoboCount > 0);
             Wait(task);
             if (!task.IsCompleted || task.Result == IntPtr.Zero)
                 return Failure("Could not open stable menu.");
 
-            State       = WorkState.StablesOpen;
+            State        = WorkState.StablesOpen;
             _chocoboMenu = IntPtr.Zero;
             _stable      = task.Result;
+            Wait(Task.Delay(StableDelay));
             return true;
         }
 
         private bool CleanStables()
         {
-            using var nextYesno = Bothers.SelectNextYesNo (true);
-            if (_chocoboMenu.Description().Contains("Good"))
+            using var nextYesno = Bothers.SelectNextYesNo(true);
+            if (_chocoboMenu.Description().Contains(StringId.StableStatusGood.Value()))
             {
                 State = WorkState.StablesClean;
                 return true;
             }
 
-            _chocoboMenu.Select(new CompareString("Clean Stable", MatchType.Equal));
+            _chocoboMenu.Select(StringId.CleanStable.Cs());
 
-            var task = Interface.AddInverted("SelectYesNo", false, DefaultTimeOut / 2);
+            var task = Interface.Add("SelectYesNo", false, DefaultTimeOut / 2);
             Wait(task);
             if (!task.IsCompleted || task.Result != IntPtr.Zero)
+                return Failure("YesNo did not open for cleaning stables.");
+
+            task = Interface.AddInverted("SelectYesNo", false, DefaultTimeOut / 2);
+            Wait(task);
+            if (!task.IsCompleted || task.Result != IntPtr.Zero || !_chocoboMenu.Description().Contains(StringId.StableStatusGood.Value()))
                 return Failure("Could not clean stables.");
 
-            _chocoboMenu             = IntPtr.Zero;
-            State                   = WorkState.None;
+            _chocoboMenu = IntPtr.Zero;
+            State        = WorkState.None;
             return true;
+        }
+
+        private unsafe void RestingBug(IntPtr plugin, IntPtr data)
+        {
+            PtrTextError error = plugin;
+            if (error.Text().Contains(StringId.ChocoboIsResting.Value()))
+            {
+                Task.Run(() =>
+                {
+                    PluginLog.Debug("Error triggered, trying again to contact chocobo again.");
+                    Wait(Task.Delay(StableDelay));
+                    if (_stable.Pointer != null)
+                        _stable.SelectNextTrainableChocobo();
+                });
+            }
         }
 
         private bool ContactChocobo()
         {
-            var task = Interface.Add("InventoryGrid0E", true, DefaultTimeOut);
+            Addons.OnTextErrorChange += RestingBug;
             if (!_stable.SelectNextTrainableChocobo())
             {
-                _stable = IntPtr.Zero;
-                State  = WorkState.JobFinished;
+                Addons.OnTextErrorChange -= RestingBug;
+                _stable                  =  IntPtr.Zero;
+                State                    =  WorkState.JobFinished;
                 return true;
             }
 
+            var task = Interface.Add("InventoryGrid0E", true, DefaultTimeOut);
             Wait(task);
+            Addons.OnTextErrorChange -= RestingBug;
             if (!task.IsCompleted || task.Result == IntPtr.Zero)
                 return Failure("Could not train chocobo.");
 
@@ -143,14 +167,14 @@ namespace Peon.Managers
             _inventory[1] = Interface.InventoryGrid(1);
             _inventory[2] = Interface.InventoryGrid(2);
             _inventory[3] = Interface.InventoryGrid(3);
-            State        = WorkState.InventoryOpen;
+            State         = WorkState.InventoryOpen;
             return true;
         }
 
         private bool FeedChocobo()
         {
             using var nextYesno = Bothers.SelectNextYesNo(true);
-            Wait(Task.Delay(100));
+            Wait(Task.Delay(StableDelay));
             if (!_inventory.Any(inventory => inventory.FeedChocobo()))
                 return Failure("No chocobo food available.");
 
@@ -162,8 +186,8 @@ namespace Peon.Managers
             State         = WorkState.StablesOpen;
             _inventory[0] = IntPtr.Zero;
             _stable       = task.Result;
+            Wait(Task.Delay(StableDelay));
             return true;
-
         }
     }
 }

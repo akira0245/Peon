@@ -5,7 +5,8 @@ namespace Peon.Modules
 {
     public unsafe struct PtrInventoryGrid
     {
-        private const int MaxIndex   = 34;
+        private const int StartIndex = 3;
+        private const int MaxIndex   = 37;
         private const int DataOffset = 0xC0;
 
         public AtkUnitBase* Pointer;
@@ -18,24 +19,19 @@ namespace Peon.Modules
 
         public bool FeedChocobo()
         {
-            var root = Pointer->RootNode;
-            var grid = root->ChildNode->PrevSiblingNode;
-            var item = grid->ChildNode;
-            var idx  = MaxIndex;
-            while (item != null)
+            var list = Pointer->UldManager.NodeList;
+            for (var i = MaxIndex; i >= StartIndex; --i)
             {
-                var component = (AtkComponentDragDrop*) ((AtkComponentNode*) item)->Component;
+                var item      = list[i];
+                var component = (AtkComponentDragDrop*)((AtkComponentNode*)item)->Component;
                 var frame     = component->AtkComponentBase.UldManager.NodeList[1];
                 var icon      = component->AtkComponentBase.UldManager.NodeList[2];
                 if (frame->IsVisible && icon->IsVisible)
                 {
-                    using Module.EventData data = new(item, (byte*) component + DataOffset);
-                    Module.ClickAddon(Pointer, item, EventType.Unk37, idx, data.Data);
+                    using Module.EventData data = new(item, (byte*)component + DataOffset);
+                    Module.ClickAddon(Pointer, item, EventType.Unk37, MaxIndex - i, data.Data);
                     return true;
                 }
-
-                --idx;
-                item = item->PrevSiblingNode;
             }
 
             return false;

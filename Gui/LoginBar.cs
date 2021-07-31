@@ -44,19 +44,19 @@ namespace Peon.Gui
             ImGui.SetNextWindowViewport(ImGui.GetMainViewport().ID);
             var textLength = ImGui.CalcTextSize("MMMMMMMMMMMMMMMMMMM").X;
             var pos        = new Vector2((ss.X - textLength) / 2, ImGui.GetMainViewport().Pos.Y + 30 * ImGui.GetIO().FontGlobalScale);
-
+            
             ImGui.SetNextWindowPos(pos, ImGuiCond.Always);
             if (!ImGui.Begin("##LaunchButtons", WindowFlags))
                 return;
-
+            
             ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing,   Vector2.Zero);
             ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 0f);
             foreach (var name in _config.CharacterNames)
                 if (ImGui.Button($"{name}##login", Vector2.UnitX * textLength))
                     _login.LogTo(name, 10000);
-
+            
             ImGui.PopStyleVar(2);
-
+            
             ImGui.End();
         }
     }

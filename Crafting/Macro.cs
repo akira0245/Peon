@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace Peon.Crafting
 {
@@ -13,6 +14,7 @@ namespace Peon.Crafting
         public ActionInfo Step(int idx)
             => Actions[idx - 1].Use();
 
+        [JsonIgnore]
         public int Count
             => Actions.Count;
     }

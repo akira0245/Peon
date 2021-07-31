@@ -50,8 +50,13 @@ namespace Peon.Managers
 
         private void CheckForRangeError(IntPtr modulePtr, IntPtr _)
         {
-            PtrTextError ptr = modulePtr;
-            if (ptr.Text() == "Too far away.")
+            PtrTextError ptr  = modulePtr;
+            var          text = ptr.Text();
+            if (StringId.TargetTooFarAway.Equal(text)
+             || StringId.CannotSeeTarget.Equal(text)
+             || StringId.TargetTooFarBelow.Equal(text)
+             || StringId.TargetTooFarAbove.Equal(text)
+             || StringId.TargetInvalidLocation.Equal(text))
             {
                 _state?.SetResult(TargetingState.ActorNotInRange);
                 _state = null;
@@ -68,6 +73,7 @@ namespace Peon.Managers
         {
             if (_state != null && !_state.Task.IsCompleted)
                 return _state.Task;
+
             _state = new TaskCompletionSource<TargetingState>();
             if (timeOutFrames <= 0)
             {
@@ -89,7 +95,7 @@ namespace Peon.Managers
         public Task<TargetingState> Interact(int timeOut, Predicate<Actor> predicate)
         {
             if (Target(predicate) != TargetingState.Success)
-                return new Task<TargetingState>(() => TargetingState.ActorNotFound);
+                return Task.Run(() => TargetingState.ActorNotFound);
 
             return Interact(timeOut);
         }

@@ -1,4 +1,6 @@
 ﻿using FFXIVClientStructs.FFXIV.Component.GUI;
+using Peon.Crafting;
+using Peon.Managers;
 using Peon.Modules;
 
 namespace Peon.Utility
@@ -31,7 +33,7 @@ namespace Peon.Utility
         public byte         Level     { get; }
         public VentureState Venture   { get; }
         public RetainerCity Location  { get; }
-        public byte         Job       { get; }
+        public RetainerJob  Job       { get; }
         public byte         Index     { get; }
 
         public static unsafe VentureState VentureStatus(AtkComponentListItemRenderer* list)
@@ -45,21 +47,35 @@ namespace Peon.Utility
 
         private static unsafe VentureState ToVenture(AtkTextNode* node)
         {
-            return Module.TextNodeToString(node) switch
-            {
-                "Complete"         => VentureState.Complete,
-                "None in progress" => VentureState.Available,
-                _                  => VentureState.InProgress,
-            };
+            var text = Module.TextNodeToString(node);
+            if (StringId.RetainerMenuComplete.Equal(text))
+                return VentureState.Complete;
+            if (StringId.RetainerMenuNone.Equal(text))
+                return VentureState.Available;
+
+            return VentureState.InProgress;
         }
 
         private static unsafe byte ToSelling(AtkTextNode* node)
         {
             var text = Module.TextNodeToString(node);
-            if (text[0] == 'N')
+            var idx = text.IndexOfAny(new[]
+            {
+                '0',
+                '1',
+                '2',
+                '3',
+                '4',
+                '5',
+                '6',
+                '7',
+                '8',
+                '9',
+            });
+            if (idx < 0)
                 return 0;
 
-            text = text.Substring(8, 2).TrimEnd();
+            text = text.Substring(idx, 2).TrimEnd();
             return byte.Parse(text);
         }
 
@@ -83,8 +99,14 @@ namespace Peon.Utility
         private static unsafe byte ToDigit(AtkTextNode* node)
             => byte.Parse(Module.TextNodeToString(node));
 
-        private static unsafe byte ToJob(AtkImageNode* node)
-            => byte.Parse(Module.ImageNodeToTexture(node).Substring(19, 2));
+        private static unsafe RetainerJob ToJob(AtkImageNode* node)
+            => byte.Parse(Module.ImageNodeToTexture(node).Substring(19, 2)) switch
+            {
+                16 => RetainerJob.Miner,
+                17 => RetainerJob.Botanist,
+                18 => RetainerJob.Fisher,
+                _  => RetainerJob.Hunter,
+            };
 
         public unsafe RetainerData(int idx, AtkComponentListItemRenderer* item)
         {

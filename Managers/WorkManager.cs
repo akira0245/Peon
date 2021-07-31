@@ -22,6 +22,7 @@ namespace Peon.Managers
         RetainerSelectCategoryOpen   = 9,
         RetainerSelectLevelRangeOpen = 10,
         RetainerTaskListOpen         = 11,
+        RetainerMenuOpenReport       = 12,
 
         // Stables
         ChocoboMenuOpen = 1,
@@ -44,7 +45,7 @@ namespace Peon.Managers
         protected WorkState State;
         public    string    ErrorText = "";
 
-        private volatile   bool                     _jobRunning = false;
+        protected volatile bool                     _jobRunning = false;
         protected volatile CancellationTokenSource? CancelToken;
 
         public void Cancel()

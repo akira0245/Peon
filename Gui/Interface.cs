@@ -14,6 +14,7 @@ namespace Peon.Gui
     {
         private readonly DalamudPluginInterface _pluginInterface;
         private readonly PeonConfiguration      _config;
+        private readonly Peon                   _peon;
 
         private          bool   _visible = false;
         private readonly string _header;
@@ -22,8 +23,9 @@ namespace Peon.Gui
         private string _newMacroName     = string.Empty;
         private string _newCharacterName = string.Empty;
 
-        public Interface(DalamudPluginInterface pi, PeonConfiguration config)
+        public Interface(Peon peon, DalamudPluginInterface pi, PeonConfiguration config)
         {
+            _peon                                     =  peon;
             _pluginInterface                          =  pi;
             _config                                   =  config;
             _pluginInterface.UiBuilder.OnBuildUi      += Draw;
@@ -317,7 +319,7 @@ namespace Peon.Gui
             for (var i = 0; i < _currentMacro.Count; ++i)
             {
                 ImGui.AlignTextToFramePadding();
-                ImGui.Text($"{i+1,3}. ");
+                ImGui.Text($"{i + 1,3}. ");
                 ImGui.SameLine();
                 var currentName = _currentMacro.Actions[i].Use().Name;
                 if (ImGui.BeginCombo($"##action{i}", currentName, ImGuiComboFlags.NoArrowButton))
@@ -334,7 +336,7 @@ namespace Peon.Gui
             }
 
             ImGui.AlignTextToFramePadding();
-            ImGui.Text($"{_currentMacro.Count+1,3}. ");
+            ImGui.Text($"{_currentMacro.Count + 1,3}. ");
             ImGui.SameLine();
             if (ImGui.BeginCombo($"##action{_currentMacro.Count}", "New Action", ImGuiComboFlags.NoArrowButton))
             {
@@ -368,7 +370,9 @@ namespace Peon.Gui
                 }
             }
 
-            if (ImGui.InputTextWithHint($"##Character{_config.CharacterNames.Count}", "New Character...", ref _newCharacterName, 32, ImGuiInputTextFlags.EnterReturnsTrue) && _newCharacterName.Any() )
+            if (ImGui.InputTextWithHint($"##Character{_config.CharacterNames.Count}", "New Character...", ref _newCharacterName, 32,
+                    ImGuiInputTextFlags.EnterReturnsTrue)
+             && _newCharacterName.Any())
             {
                 _config.CharacterNames.Add(_newCharacterName);
                 Save();
@@ -397,12 +401,47 @@ namespace Peon.Gui
             }
         }
 
+
+        private void DrawDebug()
+        {
+            using ImGuiRaii imgui = new();
+            if (!imgui.Begin(() => ImGui.BeginTabItem("Debug"), ImGui.EndTabItem))
+                return;
+
+            foreach (var job in _peon._retainers.Identifier.Tasks)
+            {
+                if (!ImGui.BeginTable($"##{job.Key}", 5, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg))
+                    continue;
+
+
+                foreach (var task in job.Value)
+                {
+                    ImGui.TableNextColumn();
+                    ImGui.Text(job.Key.ToString());
+                    ImGui.TableNextColumn();
+                    ImGui.Text(task.Key);
+                    ImGui.TableNextColumn();
+                    ImGui.Text(task.Value.Category.ToString());
+                    ImGui.TableNextColumn();
+                    ImGui.Text(task.Value.LevelRange.ToString());
+                    ImGui.TableNextColumn();
+                    ImGui.Text($"{task.Value.Item,2}");
+                    ImGui.TableNextRow();
+                }
+
+                ImGui.EndTable();
+            }
+        }
+
         private void Draw()
         {
+            if (!_visible)
+                return;
+
             var minSize = new Vector2(640 * ImGui.GetIO().FontGlobalScale, ImGui.GetTextLineHeightWithSpacing() * 5);
 
             ImGui.SetNextWindowSizeConstraints(minSize, Vector2.One * 10000);
-            if (!_visible || !ImGui.Begin(_header, ref _visible))
+            if (!ImGui.Begin(_header, ref _visible))
                 return;
 
             try
@@ -417,6 +456,7 @@ namespace Peon.Gui
                 DrawSelectBothers();
                 DrawMacros();
                 DrawLoginButtonConfig();
+                DrawDebug();
             }
             finally
             {
