@@ -1,0 +1,20 @@
+[
+	{
+		"Author": "Ottermandias",
+		"Name": "Peon",
+		"Description": "Adds commands to automate some busywork and general quality of life.",
+		"InternalName": "Peon",
+		"AssemblyVersion": "1.0.0.0",
+		"TestingAssemblyVersion": "1.0.0.0",
+		"RepoUrl": "https://github.com/Ottermandias/Peon",
+		"ApplicableVersion": "any",
+		"DalamudApiLevel": 3,
+		"IsHide": "False",
+		"IsTestingExclusive": "False",
+		"DownloadCount": 1,
+		"LastUpdate": 1618608321,
+		"DownloadLinkInstall": "https://github.com/Ottermandias/Peon/raw/main/Peon.zip",
+		"DownloadLinkTesting": "https://github.com/Ottermandias/Peon/raw/main/Peon.zip",
+		"DownloadLinkUpdate": "https://github.com/Ottermandias/Peon/raw/main/Peon.zip",
+	}
+]

@@ -5,10 +5,10 @@
 		<RootNamespace>Peon</RootNamespace>
 		<AssemblyName>Peon</AssemblyName>
 		<FileVersion>1.0.0.0</FileVersion>
-        <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
 		<Company>SoftOtter</Company>
-        <Product>Peon</Product>
-        <Copyright>Copyright © 2020</Copyright>
+    <Product>Peon</Product>
+    <Copyright>Copyright © 2020</Copyright>
 		<Deterministic>true</Deterministic>
 		<OutputType>Library</OutputType>
 		<WarningLevel>4</WarningLevel>

@@ -358,12 +358,6 @@ namespace Peon
 
             switch (argumentParts[0])
             {
-                case "test":
-                    var note = _interfaceManager.RecipeNote();
-                    if (!note)
-                        return;
-                    note.ClickJob(4);
-                    break;
                 case "cancel":
                     _retainers!.Cancel();
                     break;
@@ -397,46 +391,8 @@ namespace Peon
                         });
                     });
                     break;
-
-                case "allretainer":
-                    _retainers!.DoAllRetainers(RetainerMode.ResendWithGil);
-                    break;
-                case "synthesize":
-                    var ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("RecipeNote", 1);
-                    if (ptr != IntPtr.Zero)
-                    {
-                        PtrRecipeNote s = ptr;
-                        s.Synthesize();
-                    }
-
-                    break;
                 case "chocobo":
                     _chocobos.FeedAllChocobos();
-                    break;
-                case "bank":
-                    var bank = _interfaceManager.Bank();
-                    if (bank)
-                        bank.Minus();
-
-                    break;
-                case "feed":
-                    foreach (var name in new[]
-                    {
-                        "InventoryGrid0E",
-                        "InventoryGrid1E",
-                        "InventoryGrid2E",
-                        "InventoryGrid3E",
-                    })
-                    {
-                        ptr = _pluginInterface.Framework.Gui.GetUiObjectByName(name, 1);
-                        if (ptr == IntPtr.Zero)
-                            continue;
-
-                        PtrInventoryGrid s = ptr;
-                        if (s.FeedChocobo())
-                            return;
-                    }
-
                     break;
             }
         }

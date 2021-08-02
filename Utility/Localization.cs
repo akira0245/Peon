@@ -173,7 +173,7 @@ namespace Peon.Utility
                     null,
                 }) as ExcelSheet<RetainerString>;
             var placeName = _pi.Data.GetExcelSheet<PlaceName>(_pi.ClientState.ClientLanguage);
-            Set(StringId.ChocobosStabled,  sheet.GetRow(1).String.Payloads[0].RawString);
+            Set(StringId.ChocobosStabled,  sheet!.GetRow(1).String.Payloads[0].RawString);
             Set(StringId.ChocoboStable,    addon.GetRow(6490).Text);
             Set(StringId.TendChocobo,      sheet.GetRow(2).String);
             Set(StringId.StableStatusGood, FilterStableStatus(sheet.GetRow(1).String));
