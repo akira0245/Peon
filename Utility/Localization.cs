@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Dalamud;
+using Dalamud.Logging;
 using Dalamud.Plugin;
 using Lumina;
 using Lumina.Data;
@@ -27,8 +28,8 @@ namespace Peon.Utility
         {
             RowId      = parser.Row;
             SubRowId   = parser.SubRow;
-            Identifier = parser.ReadColumn<Lumina.Text.SeString>(0);
-            String     = parser.ReadColumn<Lumina.Text.SeString>(1);
+            Identifier = parser.ReadColumn<Lumina.Text.SeString>(0)!;
+            String     = parser.ReadColumn<Lumina.Text.SeString>(1)!;
         }
     }
 
@@ -51,17 +52,15 @@ namespace Peon.Utility
             => new(s);
 
         public override string ToString()
-            => (string) this;
+            => this;
     }
 
     public class Localization
     {
-        private readonly DalamudPluginInterface _pi;
         private readonly List<string>           _strings;
 
-        public Localization(DalamudPluginInterface pi)
+        public Localization()
         {
-            _pi      = pi;
             _strings = new List<string>();
             _strings.AddRange(Enumerable.Repeat(string.Empty, Enum.GetValues(typeof(StringId)).Length));
             SetSkills();
@@ -92,57 +91,47 @@ namespace Peon.Utility
 
         private void SetSkills()
         {
-            var sheet1 = _pi.Data.GetExcelSheet<Action>(_pi.ClientState.ClientLanguage);
-            var sheet2 = _pi.Data.GetExcelSheet<CraftAction>(_pi.ClientState.ClientLanguage);
+            var sheet1 = Dalamud.GameData.GetExcelSheet<Action>(Dalamud.ClientState.ClientLanguage)!;
+            var sheet2 = Dalamud.GameData.GetExcelSheet<CraftAction>(Dalamud.ClientState.ClientLanguage)!;
 
             foreach (var action in ActionIdExtensions.Actions.Values)
             {
                 var    actionRow = action[CrafterId.Armorer];
-                string name      = sheet1.GetRow(actionRow)?.Name ?? sheet2.GetRow(actionRow).Name;
+                string name      = sheet1.GetRow(actionRow)?.Name ?? sheet2.GetRow(actionRow)!.Name;
                 Set(action.Name.Id, name);
             }
         }
 
-        private Language FromClientLanguage()
-            => _pi.ClientState.ClientLanguage switch
-            {
-                ClientLanguage.English  => Language.English,
-                ClientLanguage.French   => Language.French,
-                ClientLanguage.German   => Language.German,
-                ClientLanguage.Japanese => Language.Japanese,
-                _                       => Language.English,
-            };
-
         private void SetRetainers()
         {
-            var placeName = _pi.Data.GetExcelSheet<PlaceName>(_pi.ClientState.ClientLanguage);
-            var retainer  = _pi.Data.GetExcelSheet<RetainerTaskRandom>(_pi.ClientState.ClientLanguage);
-            _pi.Data.Excel.RemoveSheetFromCache<RetainerString>();
-            var sheet = _pi.Data.Excel.GetType().GetMethod("GetSheet", BindingFlags.Instance | BindingFlags.NonPublic)!
-               .MakeGenericMethod(typeof(RetainerString)).Invoke(_pi.Data.Excel, new object?[]
+            var placeName = Dalamud.GameData.GetExcelSheet<PlaceName>(Dalamud.ClientState.ClientLanguage)!;
+            var retainer  = Dalamud.GameData.GetExcelSheet<RetainerTaskRandom>(Dalamud.ClientState.ClientLanguage)!;
+            Dalamud.GameData.Excel.RemoveSheetFromCache<RetainerString>();
+            var sheet = Dalamud.GameData.Excel.GetType().GetMethod("GetSheet", BindingFlags.Instance | BindingFlags.NonPublic)!
+               .MakeGenericMethod(typeof(RetainerString)).Invoke(Dalamud.GameData.Excel, new object?[]
                 {
                     "custom/000/CmnDefRetainerCall_00010",
-                    FromClientLanguage(),
+                    Dalamud.ClientState.ClientLanguage.ToLumina(),
                     null,
                 }) as ExcelSheet<RetainerString>;
 
-            Set(StringId.SelectCategory,         sheet!.GetRow(194).String);
-            Set(StringId.SelectOption,           sheet.GetRow(154).String);
-            Set(StringId.SummoningBell,          placeName.GetRow(1235).Name);
-            Set(StringId.RetainerTaskComplete,   sheet.GetRow(168).String);
-            Set(StringId.RetainerTaskAvailable,  sheet.GetRow(165).String);
-            Set(StringId.RetainerTaskInProgress, sheet.GetRow(167).String);
-            Set(StringId.QuickExploration,       retainer.GetRow(30053).Name.ToString().ToLowerInvariant());
-            Set(StringId.EntrustGil,             sheet.GetRow(156).String.ToString());
-            Set(StringId.RetainerReturn,         sheet.GetRow(192).String.ToString());
-            Set(StringId.RetainerMenuComplete,   sheet.GetRow(168).String.ToString().Split('(')[1].TrimEnd(')'));
-            Set(StringId.RetainerMenuNone,       sheet.GetRow(166).String.ToString().Split('(')[1].TrimEnd(')'));
+            Set(StringId.SelectCategory,         sheet!.GetRow(194)!.String);
+            Set(StringId.SelectOption,           sheet.GetRow(154)!.String);
+            Set(StringId.SummoningBell,          placeName.GetRow(1235)!.Name);
+            Set(StringId.RetainerTaskComplete,   sheet.GetRow(168)!.String);
+            Set(StringId.RetainerTaskAvailable,  sheet.GetRow(165)!.String);
+            Set(StringId.RetainerTaskInProgress, sheet.GetRow(167)!.String);
+            Set(StringId.QuickExploration,       retainer.GetRow(30053)!.Name.ToString().ToLowerInvariant());
+            Set(StringId.EntrustGil,             sheet.GetRow(156)!.String.ToString());
+            Set(StringId.RetainerReturn,         sheet.GetRow(192)!.String.ToString());
+            Set(StringId.RetainerMenuComplete,   sheet.GetRow(168)!.String.ToString().Split('(')[1].TrimEnd(')'));
+            Set(StringId.RetainerMenuNone,       sheet.GetRow(166)!.String.ToString().Split('(')[1].TrimEnd(')'));
         }
 
         private void SetLogin()
         {
-            var sheet = _pi.Data.GetExcelSheet<MainCommand>(_pi.ClientState.ClientLanguage);
-            Set(StringId.LogOut, sheet.GetRow(23).Name);
+            var sheet = Dalamud.GameData.GetExcelSheet<MainCommand>(Dalamud.ClientState.ClientLanguage)!;
+            Set(StringId.LogOut, sheet.GetRow(23)!.Name);
         }
 
         private static readonly Regex _stableStatusRegex =
@@ -162,34 +151,34 @@ namespace Peon.Utility
 
         private void SetChocobo()
         {
-            var addon = _pi.Data.GetExcelSheet<Addon>(_pi.ClientState.ClientLanguage);
-            var log   = _pi.Data.GetExcelSheet<LogMessage>(_pi.ClientState.ClientLanguage);
-            _pi.Data.Excel.RemoveSheetFromCache<RetainerString>();
-            var sheet = _pi.Data.Excel.GetType().GetMethod("GetSheet", BindingFlags.Instance | BindingFlags.NonPublic)!
-               .MakeGenericMethod(typeof(RetainerString)).Invoke(_pi.Data.Excel, new object?[]
+            var addon = Dalamud.GameData.GetExcelSheet<Addon>(Dalamud.ClientState.ClientLanguage)!;
+            var log   = Dalamud.GameData.GetExcelSheet<LogMessage>(Dalamud.ClientState.ClientLanguage)!;
+            Dalamud.GameData.Excel.RemoveSheetFromCache<RetainerString>();
+            var sheet = Dalamud.GameData.Excel.GetType().GetMethod("GetSheet", BindingFlags.Instance | BindingFlags.NonPublic)!
+               .MakeGenericMethod(typeof(RetainerString)).Invoke(Dalamud.GameData.Excel, new object?[]
                 {
                     "custom/002/cmndefhousingbuddystable_00201",
-                    FromClientLanguage(),
+                    Dalamud.ClientState.ClientLanguage.ToLumina(),
                     null,
                 }) as ExcelSheet<RetainerString>;
-            var placeName = _pi.Data.GetExcelSheet<PlaceName>(_pi.ClientState.ClientLanguage);
-            Set(StringId.ChocobosStabled,  sheet!.GetRow(1).String.Payloads[0].RawString);
-            Set(StringId.ChocoboStable,    addon.GetRow(6490).Text);
-            Set(StringId.TendChocobo,      sheet.GetRow(2).String);
-            Set(StringId.StableStatusGood, FilterStableStatus(sheet.GetRow(1).String));
-            Set(StringId.CleanStable,      sheet.GetRow(4).String);
-            Set(StringId.ChocoboIsResting, log.GetRow(4487).Text.Payloads.First(p => p is TextPayload).RawString.RemoveNonSimple());
-            Set(StringId.ChocoboIsReady,   addon.GetRow(6497).Text);
+            var placeName = Dalamud.GameData.GetExcelSheet<PlaceName>(Dalamud.ClientState.ClientLanguage);
+            Set(StringId.ChocobosStabled,  sheet!.GetRow(1)!.String.Payloads[0].RawString);
+            Set(StringId.ChocoboStable,    addon.GetRow(6490)!.Text);
+            Set(StringId.TendChocobo,      sheet.GetRow(2)!.String);
+            Set(StringId.StableStatusGood, FilterStableStatus(sheet.GetRow(1)!.String));
+            Set(StringId.CleanStable,      sheet.GetRow(4)!.String);
+            Set(StringId.ChocoboIsResting, log.GetRow(4487)!.Text.Payloads.First(p => p is TextPayload).RawString.RemoveNonSimple());
+            Set(StringId.ChocoboIsReady,   addon.GetRow(6497)!.Text);
         }
 
         private void SetTargeting()
         {
-            var log = _pi.Data.GetExcelSheet<LogMessage>(_pi.ClientState.ClientLanguage);
-            Set(StringId.TargetTooFarAway,      log.GetRow(1310).Text);
-            Set(StringId.TargetTooFarBelow,     log.GetRow(1316).Text);
-            Set(StringId.TargetTooFarAbove,     log.GetRow(1317).Text);
-            Set(StringId.TargetInvalidLocation, log.GetRow(1308).Text);
-            Set(StringId.CannotSeeTarget,       log.GetRow(1315).Text);
+            var log = Dalamud.GameData.GetExcelSheet<LogMessage>(Dalamud.ClientState.ClientLanguage)!;
+            Set(StringId.TargetTooFarAway,      log.GetRow(1310)!.Text);
+            Set(StringId.TargetTooFarBelow,     log.GetRow(1316)!.Text);
+            Set(StringId.TargetTooFarAbove,     log.GetRow(1317)!.Text);
+            Set(StringId.TargetInvalidLocation, log.GetRow(1308)!.Text);
+            Set(StringId.CannotSeeTarget,       log.GetRow(1315)!.Text);
         }
     }
 

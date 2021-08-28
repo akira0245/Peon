@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
-using Dalamud.Plugin;
+using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Peon.Bothers;
 

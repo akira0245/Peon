@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Dalamud.Logging;
 using Dalamud.Plugin;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Peon.Modules;
@@ -24,8 +25,7 @@ namespace Peon.Managers
         private readonly GetUiObjectByNameDelegate? _getUiObjectByNameDelegate;
         private readonly bool                       _canGetUiObject;
 
-        public InterfaceManager(DalamudPluginInterface pluginInterface)
-            : base(pluginInterface)
+        public InterfaceManager()
         {
             _baseUiObject              = Service<GetBaseUiObject>.Get().Invoke() ?? IntPtr.Zero;
             _uiProperties              = _baseUiObject != IntPtr.Zero ? Marshal.ReadIntPtr(_baseUiObject, 0x20) : IntPtr.Zero;

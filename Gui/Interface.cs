@@ -2,8 +2,6 @@
 using System.Linq;
 using System.Numerics;
 using Dalamud.Interface;
-using Dalamud.Plugin;
-using GatherBuddy.Gui;
 using ImGuiNET;
 using Peon.Bothers;
 using Peon.Crafting;
@@ -12,27 +10,23 @@ namespace Peon.Gui
 {
     public class Interface : IDisposable
     {
-        private readonly DalamudPluginInterface _pluginInterface;
-        private readonly PeonConfiguration      _config;
-        private readonly Peon                   _peon;
+        private readonly Peon _peon;
 
-        private          bool   _visible = false;
+        private          bool   _visible;
         private readonly string _header;
 
-        private Macro? _currentMacro     = null;
+        private Macro? _currentMacro;
         private string _newMacroName     = string.Empty;
         private string _newCharacterName = string.Empty;
 
-        public Interface(Peon peon, DalamudPluginInterface pi, PeonConfiguration config)
+        public Interface(Peon peon)
         {
-            _peon                                     =  peon;
-            _pluginInterface                          =  pi;
-            _config                                   =  config;
-            _pluginInterface.UiBuilder.OnBuildUi      += Draw;
-            _pluginInterface.UiBuilder.OnOpenConfigUi += SetVisibleConfig;
-            _header                                   =  Peon.Version.Length > 0 ? $"Peon v{Peon.Version}###PeonMain" : "Peon###PeonMain";
-            if (_config.CraftingMacros.Any())
-                _currentMacro = _config.CraftingMacros.Values.First();
+            _peon                                          =  peon;
+            Dalamud.PluginInterface.UiBuilder.Draw         += Draw;
+            Dalamud.PluginInterface.UiBuilder.OpenConfigUi += SetVisible;
+            _header                                        =  Peon.Version.Length > 0 ? $"Peon v{Peon.Version}###PeonMain" : "Peon###PeonMain";
+            if (Peon.Config.CraftingMacros.Any())
+                _currentMacro = Peon.Config.CraftingMacros.Values.First();
         }
 
         public void SetVisible()
@@ -72,10 +66,10 @@ namespace Peon.Gui
         private string _newTalk   = string.Empty;
         private string _newSelect = string.Empty;
 
-        private float _rowSize = 0;
+        private float _rowSize;
 
-        private void Save()
-            => _pluginInterface.SavePluginConfig(_config);
+        public static void Save()
+            => Peon.Config.Save();
 
         private bool DrawBotherTextInput(string label, string text, out string newText)
         {
@@ -86,7 +80,7 @@ namespace Peon.Gui
              && newText != string.Empty;
         }
 
-        private bool DrawMatchCombo(string label, MatchType match, out MatchType newMatch)
+        private static bool DrawMatchCombo(string label, MatchType match, out MatchType newMatch)
         {
             ImGui.SetNextItemWidth(LongestMatchText * ImGui.GetIO().FontGlobalScale);
             var matchTypeIdx = (int) match;
@@ -108,16 +102,16 @@ namespace Peon.Gui
             return newIdx;
         }
 
-        private bool DrawSourceCombo(string label, TalkSource source, out TalkSource newSource)
+        private static bool DrawSourceCombo(string label, TalkSource source, out TalkSource newSource)
             => (newSource = (TalkSource) DrawSourceCombo(label, LongestTalkText, SourceExtensions.TalkStrings, (int) source)) != source;
 
-        private bool DrawSourceCombo(string label, YesNoSource source, out YesNoSource newSource)
+        private static bool DrawSourceCombo(string label, YesNoSource source, out YesNoSource newSource)
             => (newSource = (YesNoSource) DrawSourceCombo(label, LongestYesNoText, SourceExtensions.YesNoStrings, (int) source)) != source;
 
-        private bool DrawSourceCombo(string label, SelectSource source, out SelectSource newSource)
+        private static bool DrawSourceCombo(string label, SelectSource source, out SelectSource newSource)
             => (newSource = (SelectSource) DrawSourceCombo(label, LongestSelectText, SourceExtensions.SelectStrings, (int) source)) != source;
 
-        private bool DrawDeleteButton(string label)
+        private static bool DrawDeleteButton(string label)
         {
             ImGui.PushFont(UiBuilder.IconFont);
             var value = ImGui.Button($"{FontAwesomeIcon.Trash.ToIconChar()}{label}");
@@ -125,13 +119,13 @@ namespace Peon.Gui
             return value;
         }
 
-        private bool DrawYesNoCheckbox(string label, bool yesNo, out bool newYesNo)
+        private static bool DrawYesNoCheckbox(string label, bool yesNo, out bool newYesNo)
         {
             newYesNo = yesNo;
             return ImGui.Checkbox(label, ref newYesNo) && newYesNo != yesNo;
         }
 
-        private bool DrawIndexInput(string label, int idx, out int newIdx)
+        private static bool DrawIndexInput(string label, int idx, out int newIdx)
         {
             newIdx = idx;
             ImGui.SetNextItemWidth(LongestSelectText);
@@ -153,9 +147,9 @@ namespace Peon.Gui
                 return;
 
             _rowSize = (LongestMatchText + LongestTalkText + ButtonWidth) * ImGui.GetIO().FontGlobalScale + 3 * ImGui.GetStyle().ItemSpacing.X;
-            for (var idx = 0; idx < _config.BothersTalk.Count; ++idx)
+            for (var idx = 0; idx < Peon.Config.BothersTalk.Count; ++idx)
             {
-                var bother = _config.BothersTalk[idx];
+                var bother = Peon.Config.BothersTalk[idx];
 
                 var changes = DrawBotherTextInput($"##talkText{idx}", bother.Text, out var text);
                 ImGui.SameLine();
@@ -165,20 +159,20 @@ namespace Peon.Gui
                 ImGui.SameLine();
                 if (DrawDeleteButton($"##talkTrash{idx}"))
                 {
-                    _config.BothersTalk.RemoveAt(idx);
+                    Peon.Config.BothersTalk.RemoveAt(idx);
                     --idx;
                     Save();
                 }
                 else if (changes)
                 {
-                    _config.BothersTalk[idx] = new TalkBotherSet(text, match, source);
+                    Peon.Config.BothersTalk[idx] = new TalkBotherSet(text, match, source);
                     Save();
                 }
             }
 
             if (DrawNewTextInput("##talkNew", ref _newTalk))
             {
-                _config.BothersTalk.Add(new TalkBotherSet(_newTalk, MatchType.Equal, TalkSource.Disabled));
+                Peon.Config.BothersTalk.Add(new TalkBotherSet(_newTalk, MatchType.Equal, TalkSource.Disabled));
                 Save();
                 _newTalk = string.Empty;
             }
@@ -193,9 +187,9 @@ namespace Peon.Gui
 
             _rowSize = (LongestMatchText + LongestYesNoText + 2 * ButtonWidth) * ImGui.GetIO().FontGlobalScale
               + 4 * ImGui.GetStyle().ItemSpacing.X;
-            for (var idx = 0; idx < _config.BothersYesNo.Count; ++idx)
+            for (var idx = 0; idx < Peon.Config.BothersYesNo.Count; ++idx)
             {
-                var bother = _config.BothersYesNo[idx];
+                var bother = Peon.Config.BothersYesNo[idx];
 
                 var changes = DrawBotherTextInput($"##yesNoText{idx}", bother.Text, out var text);
                 ImGui.SameLine();
@@ -207,20 +201,20 @@ namespace Peon.Gui
                 ImGui.SameLine();
                 if (DrawDeleteButton($"##yesNoTrash{idx}"))
                 {
-                    _config.BothersYesNo.RemoveAt(idx);
+                    Peon.Config.BothersYesNo.RemoveAt(idx);
                     --idx;
                     Save();
                 }
                 else if (changes)
                 {
-                    _config.BothersYesNo[idx] = new ChoiceBotherSet(text, match, source, yesNo);
+                    Peon.Config.BothersYesNo[idx] = new ChoiceBotherSet(text, match, source, yesNo);
                     Save();
                 }
             }
 
             if (DrawNewTextInput("##yesNoNew", ref _newYesNo))
             {
-                _config.BothersYesNo.Add(new ChoiceBotherSet(_newYesNo, MatchType.Equal, YesNoSource.Disabled, true));
+                Peon.Config.BothersYesNo.Add(new ChoiceBotherSet(_newYesNo, MatchType.Equal, YesNoSource.Disabled, true));
                 Save();
                 _newYesNo = string.Empty;
             }
@@ -234,9 +228,9 @@ namespace Peon.Gui
 
             _rowSize = (LongestMatchText + LongestSelectText + ButtonWidth) * ImGui.GetIO().FontGlobalScale
               + 3 * ImGui.GetStyle().ItemSpacing.X;
-            for (var idx = 0; idx < _config.BothersSelect.Count; ++idx)
+            for (var idx = 0; idx < Peon.Config.BothersSelect.Count; ++idx)
             {
-                var bother = _config.BothersSelect[idx];
+                var bother = Peon.Config.BothersSelect[idx];
 
                 var changes = DrawBotherTextInput($"##selectSText{idx}", bother.SelectionText, out var selectionText);
                 ImGui.SameLine();
@@ -246,7 +240,7 @@ namespace Peon.Gui
                 ImGui.SameLine();
                 if (DrawDeleteButton($"##selectTrash{idx}"))
                 {
-                    _config.BothersSelect.RemoveAt(idx);
+                    Peon.Config.BothersSelect.RemoveAt(idx);
                     --idx;
                     Save();
                     continue;
@@ -262,7 +256,7 @@ namespace Peon.Gui
 
                 if (changes)
                 {
-                    _config.BothersSelect[idx] =
+                    Peon.Config.BothersSelect[idx] =
                         new SelectBotherSet(selectionText, selectionMatch, index, mainText, mainMatch) { Source = source };
                     Save();
                 }
@@ -270,7 +264,7 @@ namespace Peon.Gui
 
             if (DrawNewTextInput("##selectNew", ref _newSelect))
             {
-                _config.BothersSelect.Add(new SelectBotherSet(_newSelect, MatchType.Equal) { Source = SelectSource.Disabled });
+                Peon.Config.BothersSelect.Add(new SelectBotherSet(_newSelect, MatchType.Equal) { Source = SelectSource.Disabled });
                 Save();
                 _newSelect = string.Empty;
             }
@@ -282,10 +276,9 @@ namespace Peon.Gui
             if (!imgui.Begin(() => ImGui.BeginTabItem("Crafting Macros"), ImGui.EndTabItem))
                 return;
 
-            var macros = _config.CraftingMacros.Values.ToArray();
             if (ImGui.BeginCombo("Current Macro", _currentMacro?.Name ?? ""))
             {
-                foreach (var macro in _config.CraftingMacros)
+                foreach (var macro in Peon.Config.CraftingMacros)
                     if (ImGui.Selectable(macro.Value.Name, macro.Value == _currentMacro))
                         _currentMacro = macro.Value;
                 ImGui.EndCombo();
@@ -294,9 +287,9 @@ namespace Peon.Gui
             ImGui.InputTextWithHint("##NewMacro", "Enter new macro name...", ref _newMacroName, 64);
             ImGui.SameLine();
             if (ImGui.Button("New Macro"))
-                if (_newMacroName != string.Empty && !_config.CraftingMacros.ContainsKey(_newMacroName))
+                if (_newMacroName != string.Empty && !Peon.Config.CraftingMacros.ContainsKey(_newMacroName))
                 {
-                    _config.CraftingMacros.Add(_newMacroName, new Macro(_newMacroName));
+                    Peon.Config.CraftingMacros.Add(_newMacroName, new Macro(_newMacroName));
                     Save();
                     _newMacroName = string.Empty;
                 }
@@ -310,7 +303,7 @@ namespace Peon.Gui
             ImGui.PopFont();
             if (deleteVal)
             {
-                _config.CraftingMacros.Remove(_currentMacro!.Name!);
+                Peon.Config.CraftingMacros.Remove(_currentMacro!.Name!);
                 Save();
                 _currentMacro = null;
                 return;
@@ -357,24 +350,24 @@ namespace Peon.Gui
             if (!imgui.Begin(() => ImGui.BeginTabItem("Login Buttons"), ImGui.EndTabItem))
                 return;
 
-            for (var i = 0; i < _config.CharacterNames.Count; ++i)
+            for (var i = 0; i < Peon.Config.CharacterNames.Count; ++i)
             {
-                var name = _config.CharacterNames[i];
-                if (ImGui.InputText($"##Character{i}", ref name, 32) && name != _config.CharacterNames[i])
+                var name = Peon.Config.CharacterNames[i];
+                if (ImGui.InputText($"##Character{i}", ref name, 32) && name != Peon.Config.CharacterNames[i])
                 {
                     if (!name.Any())
-                        _config.CharacterNames.RemoveAt(i);
+                        Peon.Config.CharacterNames.RemoveAt(i);
                     else
-                        _config.CharacterNames[i] = name;
+                        Peon.Config.CharacterNames[i] = name;
                     Save();
                 }
             }
 
-            if (ImGui.InputTextWithHint($"##Character{_config.CharacterNames.Count}", "New Character...", ref _newCharacterName, 32,
+            if (ImGui.InputTextWithHint($"##Character{Peon.Config.CharacterNames.Count}", "New Character...", ref _newCharacterName, 32,
                     ImGuiInputTextFlags.EnterReturnsTrue)
              && _newCharacterName.Any())
             {
-                _config.CharacterNames.Add(_newCharacterName);
+                Peon.Config.CharacterNames.Add(_newCharacterName);
                 Save();
                 _newCharacterName = string.Empty;
             }
@@ -386,17 +379,17 @@ namespace Peon.Gui
             if (!imgui.Begin(() => ImGui.BeginTabItem("Config"), ImGui.EndTabItem))
                 return;
 
-            var enableBothers = _config.EnableNoBother;
-            if (ImGui.Checkbox("Enable Bothers", ref enableBothers) && enableBothers != _config.EnableNoBother)
+            var enableBothers = Peon.Config.EnableNoBother;
+            if (ImGui.Checkbox("Enable Bothers", ref enableBothers) && enableBothers != Peon.Config.EnableNoBother)
             {
-                _config.EnableNoBother = enableBothers;
+                Peon.Config.EnableNoBother = enableBothers;
                 Save();
             }
 
-            var enableLoginButtons = _config.EnableLoginButtons;
-            if (ImGui.Checkbox("Enable Login Buttons", ref enableLoginButtons) && enableLoginButtons != _config.EnableLoginButtons)
+            var enableLoginButtons = Peon.Config.EnableLoginButtons;
+            if (ImGui.Checkbox("Enable Login Buttons", ref enableLoginButtons) && enableLoginButtons != Peon.Config.EnableLoginButtons)
             {
-                _config.EnableLoginButtons = enableLoginButtons;
+                Peon.Config.EnableLoginButtons = enableLoginButtons;
                 Save();
             }
         }
@@ -408,7 +401,7 @@ namespace Peon.Gui
             if (!imgui.Begin(() => ImGui.BeginTabItem("Debug"), ImGui.EndTabItem))
                 return;
 
-            foreach (var job in _peon._retainers.Identifier.Tasks)
+            foreach (var job in _peon.Retainers.Identifier.Tasks)
             {
                 if (!ImGui.BeginTable($"##{job.Key}", 5, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg))
                     continue;
@@ -464,14 +457,11 @@ namespace Peon.Gui
             }
         }
 
-        private void SetVisibleConfig(object _, object _2)
-            => SetVisible();
-
         public void Dispose()
         {
-            _visible                                  =  false;
-            _pluginInterface.UiBuilder.OnOpenConfigUi -= SetVisibleConfig;
-            _pluginInterface.UiBuilder.OnBuildUi      -= Draw;
+            _visible                                       =  false;
+            Dalamud.PluginInterface.UiBuilder.OpenConfigUi -= SetVisible;
+            Dalamud.PluginInterface.UiBuilder.Draw         -= Draw;
         }
     }
 }

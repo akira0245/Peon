@@ -8,7 +8,7 @@
 		"TestingAssemblyVersion": "1.0.0.0",
 		"RepoUrl": "https://github.com/Ottermandias/Peon",
 		"ApplicableVersion": "any",
-		"DalamudApiLevel": 3,
+		"DalamudApiLevel": 4,
 		"IsHide": "False",
 		"IsTestingExclusive": "False",
 		"DownloadCount": 1,

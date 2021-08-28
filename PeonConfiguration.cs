@@ -17,5 +17,18 @@ namespace Peon
         public readonly List<string>          CharacterNames = new();
 
         public readonly Dictionary<string, Macro> CraftingMacros = new();
+
+        public void Save()
+            => Dalamud.PluginInterface.SavePluginConfig(this);
+
+        public static PeonConfiguration Load()
+        {
+            if (Dalamud.PluginInterface.GetPluginConfig() is PeonConfiguration cfg)
+                return cfg;
+
+            cfg = new PeonConfiguration();
+            cfg.Save();
+            return cfg;
+        }
     }
 }

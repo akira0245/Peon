@@ -1,7 +1,6 @@
 ﻿using System;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Peon.Bothers;
-using Peon.Utility;
 
 namespace Peon.Modules
 {

@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using Dalamud.Game;
 using Dalamud.Hooking;
-using Dalamud.Plugin;
+using Dalamud.Logging;
 
 namespace Peon.SeFunctions
 {
@@ -49,7 +49,7 @@ namespace Peon.SeFunctions
             if (Address != IntPtr.Zero)
             {
                 FuncDelegate = Marshal.GetDelegateForFunctionPointer<T>(Address);
-                return FuncDelegate.DynamicInvoke(parameters);
+                return FuncDelegate!.DynamicInvoke(parameters);
             }
             else
             {

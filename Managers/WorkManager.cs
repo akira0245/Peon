@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game.Internal.Gui;
+using Dalamud.Logging;
 using Dalamud.Plugin;
 
 namespace Peon.Managers
@@ -36,11 +36,10 @@ namespace Peon.Managers
     public class WorkManager
     {
         protected const    int              DefaultTimeOut = 3000;
-        protected readonly TargetManager    Target;
+        protected readonly TargetManager    Targets;
         protected readonly AddonWatcher     Addons;
         protected readonly BotherHelper     Bothers;
         protected readonly InterfaceManager Interface;
-        protected readonly ChatGui          Chat;
 
         protected WorkState State;
         public    string    ErrorText = "";
@@ -54,7 +53,7 @@ namespace Peon.Managers
                 return;
 
             CancelToken.Cancel();
-            Chat.Print("Cancellation of current job requested.");
+            Dalamud.Chat.Print("Cancellation of current job requested.");
         }
 
         protected void Wait<T>(Task<T> task)
@@ -80,11 +79,10 @@ namespace Peon.Managers
             return false;
         }
 
-        protected WorkManager(DalamudPluginInterface pluginInterface, TargetManager target, AddonWatcher addons, BotherHelper bothers,
+        protected WorkManager(TargetManager target, AddonWatcher addons, BotherHelper bothers,
             InterfaceManager iManager)
         {
-            Chat      = pluginInterface.Framework.Gui.Chat;
-            Target    = target;
+            Targets   = target;
             Addons    = addons;
             Bothers   = bothers;
             Interface = iManager;
@@ -94,7 +92,7 @@ namespace Peon.Managers
         {
             if (_jobRunning)
             {
-                Chat.PrintError($"[{GetType().Name}] Can not start job. Job is already running.");
+                Dalamud.Chat.PrintError($"[{GetType().Name}] Can not start job. Job is already running.");
                 return;
             }
 
@@ -121,7 +119,7 @@ namespace Peon.Managers
                     if (State == WorkState.Error)
                     {
                         PluginLog.Error("Error during job: {Error:l}", ErrorText);
-                        Chat.PrintError(ErrorText);
+                        Dalamud.Chat.PrintError(ErrorText);
                         State = WorkState.JobFinished;
                     }
                     else

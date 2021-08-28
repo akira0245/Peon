@@ -1,5 +1,4 @@
-﻿using System;
-using Dalamud.Game;
+﻿using Dalamud.Game;
 
 namespace Peon.SeFunctions
 {

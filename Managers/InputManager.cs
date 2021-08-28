@@ -1,5 +1,5 @@
 ﻿using System.Threading.Tasks;
-using Dalamud.Plugin;
+using Dalamud.Logging;
 using Peon.SeFunctions;
 using Peon.Utility;
 

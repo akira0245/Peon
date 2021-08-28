@@ -1,5 +1,4 @@
 ﻿using System;
-using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace Peon.Modules

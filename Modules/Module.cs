@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using Dalamud.Plugin;
+using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace Peon.Modules
@@ -18,7 +17,7 @@ namespace Peon.Modules
         public static string ImageNodeToTexture(AtkImageNode* node)
         {
             var texInfo = node->PartsList->Parts[node->PartId].UldAsset;
-            return Marshal.PtrToStringAnsi(new IntPtr(texInfo->AtkTexture.Resource->TexFileResourceHandle->ResourceHandle.FileName))!;
+            return texInfo->AtkTexture.Resource->TexFileResourceHandle->ResourceHandle.FileName.ToString();
         }
 
         public static void** ObtainVTable(void* addon)

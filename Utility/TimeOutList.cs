@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Dalamud.Logging;
 using Dalamud.Plugin;
 
 namespace Peon.Utility
@@ -21,12 +22,8 @@ namespace Peon.Utility
             }
         }
 
-        protected readonly DalamudPluginInterface _pluginInterface;
-        private readonly   LinkedList<WaitBlock>  _waitList = new();
-        protected          ulong                  _currentTime;
-
-        public TimeOutList(DalamudPluginInterface pluginInterface)
-            => _pluginInterface = pluginInterface;
+        private readonly LinkedList<WaitBlock> _waitList = new();
+        protected        ulong                 _currentTime;
 
         protected virtual TRet OnCheck(TInfo info)
             => throw new NotImplementedException();
@@ -45,7 +42,7 @@ namespace Peon.Utility
 
         protected Task<TRet> Add(TInfo info, int timeOutMs)
         {
-            var ret = OnCheck(info);
+            var                        ret  = OnCheck(info);
             TaskCompletionSource<TRet> task = new();
             if (RetIsValid(ret, info))
             {
@@ -58,7 +55,7 @@ namespace Peon.Utility
             lock (_waitList)
             {
                 if (_waitList.Count == 0)
-                    _pluginInterface.Framework.OnUpdateEvent += OnFrameworkUpdate;
+                    Dalamud.Framework.Update += OnFrameworkUpdate;
 
                 _waitList.AddLast(block);
             }
@@ -70,11 +67,11 @@ namespace Peon.Utility
         {
             if (_waitList.Count > 0)
             {
-                _pluginInterface.Framework.OnUpdateEvent -= OnFrameworkUpdate;
+                Dalamud.Framework.Update -= OnFrameworkUpdate;
                 foreach (var x in _waitList)
                     x.Task.SetCanceled();
             }
-            
+
             _waitList.Clear();
         }
 
@@ -87,7 +84,7 @@ namespace Peon.Utility
                 if (_waitList.Count != 0)
                     return;
 
-                _pluginInterface.Framework.OnUpdateEvent -= OnFrameworkUpdate;
+                Dalamud.Framework.Update -= OnFrameworkUpdate;
             }
         }
 
@@ -98,10 +95,10 @@ namespace Peon.Utility
                 var node = _waitList.First;
                 while (node != null)
                 {
-                    var next   = node.Next;
+                    var next = node.Next;
                     if (predicate(node.Value.Infos))
                         RemoveNode(node);
-                    node       = next;
+                    node = next;
                 }
             }
         }
@@ -112,7 +109,7 @@ namespace Peon.Utility
             var node = _waitList.First;
             while (node != null)
             {
-                var next   = node.Next;
+                var next  = node.Next;
                 var block = node.Value;
                 if (block.TimeOut < _currentTime)
                 {
@@ -124,12 +121,13 @@ namespace Peon.Utility
                 var ret = OnCheck(node.Value.Infos);
                 if (RetIsValid(ret, node.Value.Infos))
                 {
-                    PluginLog.Verbose("[{TimeOutList:l}] Wait for {Name} returned {Result}.", GetType().Name, ToString(node.Value.Infos), ToString(ret));
+                    PluginLog.Verbose("[{TimeOutList:l}] Wait for {Name} returned {Result}.", GetType().Name, ToString(node.Value.Infos),
+                        ToString(ret));
                     node.Value.Task.SetResult(ret);
                     RemoveNode(node);
                 }
 
-                node       = next;
+                node = next;
             }
         }
     }

@@ -1,8 +1,6 @@
 ﻿using System;
-using Dalamud.Plugin;
 using FFXIVClientStructs.FFXIV.Client.Graphics;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using Peon.Crafting;
 using Peon.Utility;
 
 namespace Peon.Modules

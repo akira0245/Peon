@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Dalamud.Logging;
 using Dalamud.Plugin;
 using Peon.Modules;
 using Peon.Utility;
@@ -11,9 +12,9 @@ namespace Peon.Managers
     public class ChocoboManager : WorkManager
     {
         private const int StableDelay = 500;
-        public ChocoboManager(DalamudPluginInterface pluginInterface, TargetManager target, AddonWatcher addons, BotherHelper bothers,
+        public ChocoboManager(TargetManager target, AddonWatcher addons, BotherHelper bothers,
             InterfaceManager iManager)
-            : base(pluginInterface, target, addons, bothers, iManager)
+            : base(target, addons, bothers, iManager)
         { }
 
         private PtrSelectString       _chocoboMenu;
@@ -67,7 +68,7 @@ namespace Peon.Managers
                 return true;
             }
 
-            var targetTask = Target.Interact(StringId.ChocoboStable.Value(), DefaultTimeOut / 6);
+            var targetTask = Targets.Interact(StringId.ChocoboStable.Value(), DefaultTimeOut / 6);
 
             Wait(targetTask);
             switch (targetTask.IsCompleted ? targetTask.Result : TargetingState.TimeOut)

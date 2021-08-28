@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
-using Peon.Crafting;
 using Peon.Utility;
 
 namespace Peon.Bothers

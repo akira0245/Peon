@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Threading.Tasks;
 using Dalamud.Hooking;
+using Dalamud.Logging;
 using Dalamud.Plugin;
 using Peon.SeFunctions;
 using Peon.Utility;
@@ -40,8 +41,7 @@ namespace Peon.Managers
         public event OnAddonEventDelegate? OnTalkUpdate;
         public event OnAddonEventDelegate? OnTextErrorChange;
 
-        public AddonWatcher(DalamudPluginInterface pluginInterface)
-            : base(pluginInterface)
+        public AddonWatcher()
         {
             _onSelectYesnoSetupHook  = Service<YesNoOnSetup>.Get().CreateHook(OnSelectYesNoSetupDetour);
             _onSelectStringSetupHook = Service<SelectStringOnSetup>.Get().CreateHook(OnSelectStringSetupDetour);

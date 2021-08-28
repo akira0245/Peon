@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Actors.Types;
+using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Logging;
 using Dalamud.Plugin;
 using Peon.Modules;
 using Peon.Utility;
@@ -18,27 +19,25 @@ namespace Peon.Managers
 
     public class TargetManager
     {
-        private readonly DalamudPluginInterface                _pluginInterface;
         private readonly InputManager                          _inputManager;
         private readonly AddonWatcher                          _addons;
         private          TaskCompletionSource<TargetingState>? _state;
 
-        public TargetManager(DalamudPluginInterface pluginInterface, InputManager inputManager, AddonWatcher addons)
+        public TargetManager(InputManager inputManager, AddonWatcher addons)
         {
-            _pluginInterface = pluginInterface;
             _inputManager    = inputManager;
             _addons          = addons;
         }
 
-        public TargetingState Target(Predicate<Actor> predicate)
+        public TargetingState Target(Predicate<GameObject> predicate)
         {
-            foreach (var actor in _pluginInterface.ClientState.Actors)
+            foreach (var actor in Dalamud.Objects)
             {
                 if (!predicate(actor))
                     continue;
 
-                PluginLog.Verbose("Target set to actor {ActorId}: \"{ActorName}\".", actor.ActorId, actor.Name);
-                _pluginInterface.ClientState.Targets.SetCurrentTarget(actor);
+                PluginLog.Verbose("Target set to actor {ActorId}: \"{ActorName}\".", actor.ObjectId, actor.Name);
+                Dalamud.Targets.SetTarget(actor);
                 return TargetingState.Success;
             }
 
@@ -46,7 +45,7 @@ namespace Peon.Managers
         }
 
         public TargetingState Target(string targetName)
-            => Target(actor => actor.Name == targetName);
+            => Target(actor => actor.Name.ToString() == targetName);
 
         private void CheckForRangeError(IntPtr modulePtr, IntPtr _)
         {
@@ -92,7 +91,7 @@ namespace Peon.Managers
             return task;
         }
 
-        public Task<TargetingState> Interact(int timeOut, Predicate<Actor> predicate)
+        public Task<TargetingState> Interact(int timeOut, Predicate<GameObject> predicate)
         {
             if (Target(predicate) != TargetingState.Success)
                 return Task.Run(() => TargetingState.ActorNotFound);
@@ -101,6 +100,6 @@ namespace Peon.Managers
         }
 
         public Task<TargetingState> Interact(string targetName, int timeOut)
-            => Interact(timeOut, actor => actor.Name == targetName);
+            => Interact(timeOut, actor => actor.Name.ToString() == targetName);
     }
 }

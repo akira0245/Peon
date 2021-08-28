@@ -3,28 +3,25 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.InteropServices;
-using Dalamud.Game.Internal;
+using Dalamud.Game;
+using Dalamud.Logging;
 using Dalamud.Plugin;
 using Peon.Bothers;
 using Peon.Modules;
-using Peon.Utility;
 
 namespace Peon.Managers
 {
     public class BotherHelper : IDisposable
     {
-        private readonly DalamudPluginInterface _pluginInterface;
         private readonly AddonWatcher           _addons;
-        private readonly PeonConfiguration      _config;
-
 
         private readonly List<ChoiceBotherSet> _bothersYesNo;
 
         private readonly List<TalkBotherSet>   _bothersTalk;
         private readonly List<SelectBotherSet> _bothersSelect;
 
-        internal         bool            _skipNextTalk        = false;
-        internal         bool?           _selectNextYesNo     = null;
+        internal bool  _skipNextTalk;
+        internal bool? _selectNextYesNo;
 
         public BotherSetter SkipNextTalk()
             => new(true, _selectNextYesNo, this);
@@ -54,14 +51,12 @@ namespace Peon.Managers
             }
         }
 
-        public BotherHelper(DalamudPluginInterface pluginInterface, AddonWatcher addons, PeonConfiguration configuration)
+        public BotherHelper(AddonWatcher addons)
         {
-            _pluginInterface = pluginInterface;
             _addons          = addons;
-            _config          = configuration;
-            _bothersYesNo    = configuration.BothersYesNo;
-            _bothersTalk     = configuration.BothersTalk;
-            _bothersSelect   = configuration.BothersSelect;
+            _bothersYesNo    = Peon.Config.BothersYesNo;
+            _bothersTalk     = Peon.Config.BothersTalk;
+            _bothersSelect   = Peon.Config.BothersSelect;
 
             _addons.OnSelectStringSetup += OnSelectStringSetup;
             _addons.OnSelectYesnoSetup  += OnYesNoSetup;
@@ -78,7 +73,7 @@ namespace Peon.Managers
 
         private void OnSelectStringSetup(IntPtr ptr, IntPtr _)
         {
-            if (!_config.EnableNoBother)
+            if (!Peon.Config.EnableNoBother)
                 return;
 
             PtrSelectString selectStringPtr = ptr;
@@ -174,7 +169,7 @@ namespace Peon.Managers
 
         private void OnTalkUpdate(IntPtr ptr, IntPtr _)
         {
-            if (!_skipNextTalk && !_config.EnableNoBother)
+            if (!_skipNextTalk && !Peon.Config.EnableNoBother)
                 return;
 
             PtrTalk talkPtr = ptr;
@@ -196,14 +191,14 @@ namespace Peon.Managers
                     if (talkPtr.IsVisible)
                         talkPtr.Click();
                     else
-                        _pluginInterface.Framework.OnUpdateEvent -= TmpDelegate;
+                        Dalamud.Framework.Update -= TmpDelegate;
                 }
 
                 if (!click)
                     continue;
 
-                _skipNextTalk                            =  false;
-                _pluginInterface.Framework.OnUpdateEvent += TmpDelegate;
+                _skipNextTalk            =  false;
+                Dalamud.Framework.Update += TmpDelegate;
                 PluginLog.Verbose("Clicked Talk window due to match on {StringType}, {MatchType}: \"{Text}\".", set.Source, set.MatchType,
                     set.Text);
                 break;
@@ -219,9 +214,10 @@ namespace Peon.Managers
                 selectPtr.Click(_selectNextYesNo.Value);
                 return;
             }
+
             _selectNextYesNo = null;
 
-            if (!_config.EnableNoBother)
+            if (!Peon.Config.EnableNoBother)
                 return;
 
             var stringPtr = *(void**) ((byte*) updateData.ToPointer() + 0x8);

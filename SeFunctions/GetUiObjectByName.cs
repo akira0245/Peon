@@ -3,7 +3,7 @@ using Dalamud.Game;
 
 namespace Peon.SeFunctions
 {
-    public delegate IntPtr GetUiObjectByNameDelegate(IntPtr baseUIObj, string name, int index);
+    public delegate IntPtr GetUiObjectByNameDelegate(IntPtr baseUiObj, string name, int index);
 
     public sealed class GetUiObjectByName : SeFunctionBase<GetUiObjectByNameDelegate>
     {

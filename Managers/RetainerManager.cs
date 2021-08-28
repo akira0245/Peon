@@ -2,9 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using Dalamud.Plugin;
 using Peon.Bothers;
-using Peon.Crafting;
 using Peon.Modules;
 using Peon.Utility;
 
@@ -49,16 +47,16 @@ namespace Peon.Managers
         private PtrSelectString       _retainerMenu;
         private PtrBank               _bank;
 
-        private RetainerType                        _retainerType       = RetainerType.Name;
-        private CompareString                       _retainerName       = default;
-        private int[]                               _retainerIndices    = Array.Empty<int>();
-        private RetainerIdentifier.RetainerTaskInfo _retainerInfo       = default;
+        private RetainerType                        _retainerType = RetainerType.Name;
+        private CompareString                       _retainerName;
+        private int[]                               _retainerIndices = Array.Empty<int>();
+        private RetainerIdentifier.RetainerTaskInfo _retainerInfo;
         private int                                 _currentRetainerIdx = -1;
 
-        public RetainerManager(DalamudPluginInterface pluginInterface, TargetManager target, AddonWatcher addons, BotherHelper bothers,
+        public RetainerManager(TargetManager target, AddonWatcher addons, BotherHelper bothers,
             InterfaceManager interfaceManager)
-            : base(pluginInterface, target, addons, bothers, interfaceManager)
-            => Identifier = new RetainerIdentifier(pluginInterface);
+            : base(target, addons, bothers, interfaceManager)
+            => Identifier = new RetainerIdentifier();
 
         public void SetRetainer(CompareString name)
         {
@@ -246,7 +244,7 @@ namespace Peon.Managers
         {
             var indices = GetTaskInfos(item);
             if (indices != null && indices.Count == 0)
-                Chat.Print($"Item {item} could not be identified for the given jobs.");
+                Dalamud.Chat.Print($"Item {item} could not be identified for the given jobs.");
 
             var flags = indices?.Keys.Aggregate((RetainerJob) 0, (j1, j2) => j1 | j2)
              ?? RetainerJob.Botanist | RetainerJob.Fisher | RetainerJob.Hunter | RetainerJob.Miner;
@@ -343,7 +341,7 @@ namespace Peon.Managers
         {
             var task = Interface.Add("RetainerList", true, DefaultTimeOut);
 
-            var targetTask = Target.Interact(StringId.SummoningBell.Value(), DefaultTimeOut / 6);
+            var targetTask = Targets.Interact(StringId.SummoningBell.Value(), DefaultTimeOut / 6);
             Wait(targetTask);
             if (!targetTask.IsCompleted || targetTask.Result != TargetingState.Success)
                 return Failure($"Targeting failed {targetTask.Result}.");

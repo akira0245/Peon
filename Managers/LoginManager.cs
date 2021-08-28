@@ -2,7 +2,6 @@
 using System.Threading.Tasks;
 using Dalamud.Plugin;
 using Peon.Bothers;
-using Peon.Crafting;
 using Peon.Modules;
 using Peon.Utility;
 
@@ -10,16 +9,14 @@ namespace Peon.Managers
 {
     public class LoginManager
     {
-        private readonly DalamudPluginInterface _pluginInterface;
         private readonly InterfaceManager       _interfaceManager;
         private readonly BotherHelper           _botherHelper;
-        private          string                 _lastCharacterName = "";
+        private          string                 _lastCharacterName = string.Empty;
         private          string[]?              _characters;
-        private          bool                   _running = false;
+        private          bool                   _running;
 
-        public LoginManager(DalamudPluginInterface pluginInterface, BotherHelper botherHelper, InterfaceManager interfaceManager)
+        public LoginManager(BotherHelper botherHelper, InterfaceManager interfaceManager)
         {
-            _pluginInterface  = pluginInterface;
             _interfaceManager = interfaceManager;
             _botherHelper     = botherHelper;
         }
@@ -28,7 +25,7 @@ namespace Peon.Managers
         {
             if (_running)
             {
-                _pluginInterface.Framework.Gui.Chat.PrintError($"Character Task already running.");
+                Dalamud.Chat.PrintError($"Character Task already running.");
                 return;
             }
 
@@ -57,13 +54,13 @@ namespace Peon.Managers
 
         public void NextCharacter(int timeout)
         {
-            _lastCharacterName = _pluginInterface.ClientState.LocalPlayer?.Name ?? "";
+            _lastCharacterName = Dalamud.ClientState.LocalPlayer?.Name.ToString() ?? string.Empty;
             CharacterTask(timeout, ptr => NextCharacterIntern(ptr, false));
         }
 
         public void PreviousCharacter(int timeout)
         {
-            _lastCharacterName = _pluginInterface.ClientState.LocalPlayer?.Name ?? "";
+            _lastCharacterName = Dalamud.ClientState.LocalPlayer?.Name.ToString() ?? string.Empty;
             CharacterTask(timeout, ptr => NextCharacterIntern(ptr, true));
         }
 
@@ -85,7 +82,7 @@ namespace Peon.Managers
         private IntPtr LogOut(int timeout)
         {
             using var nextYesno = _botherHelper.SelectNextYesNo(true);
-            if (_pluginInterface.ClientState.Condition.Any())
+            if (Dalamud.Conditions.Any())
             {
                 var task = _interfaceManager.Add("_MainCommand", true, timeout);
                 task.SafeWait();

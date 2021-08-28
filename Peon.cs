@@ -1,10 +1,13 @@
 ﻿using System;
-using System.ComponentModel;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Dalamud.Game.Command;
+using Dalamud.Hooking;
 using Dalamud.Plugin;
+using Lumina.Excel;
+using Lumina.Excel.GeneratedSheets;
 using Peon.Bothers;
 using Peon.Crafting;
 using Peon.Gui;
@@ -23,119 +26,187 @@ namespace Peon
         public string Name
             => "Peon";
 
-        public DalamudPluginInterface _pluginInterface  = null!;
-        public Interface              _interface        = null!;
-        public InterfaceManager       _interfaceManager = null!;
-        public PeonConfiguration      _configuration    = null!;
-        public AddonWatcher           _addons           = null!;
-        public BotherHelper           _ohBother         = null!;
-        public InputManager           _inputManager     = null!;
-        public TargetManager          _targeting        = null!;
-        public RetainerManager        _retainers        = null!;
-        public LoginManager           _login            = null!;
-        public ChocoboManager         _chocobos         = null!;
-        public CommandManager         _commands         = null!;
-        public Crafter                _crafter          = null!;
-        public LoginBar               _loginBar         = null!;
-        public Localization           _localization     = null!;
+        public static PeonConfiguration Config = null!;
+
+
+        public readonly Interface        Interface;
+        public readonly InterfaceManager InterfaceManager;
+
+        public readonly AddonWatcher    Addons;
+        public readonly BotherHelper    OhBother;
+        public readonly InputManager    InputManager;
+        public readonly TargetManager   Targeting;
+        public readonly RetainerManager Retainers;
+        public readonly LoginManager    Login;
+        public readonly ChocoboManager  Chocobos;
+        public readonly CommandManager  Commands;
+        public readonly Crafter         Crafter;
+        public readonly LoginBar        LoginBar;
+        public readonly Localization    Localization;
+        public readonly DebuggerCheck   DebuggerCheck;
+        public readonly HookManager     Hooks = new();
 
         public static long BaseAddress;
 
+        private static void Print(string s)
+            => Dalamud.Chat.Print(s);
 
-        private void Print(string s)
-            => _pluginInterface.Framework.Gui.Chat.Print(s);
+        private static void Error(string s)
+            => Dalamud.Chat.PrintError(s);
 
-        private void Error(string s)
-            => _pluginInterface.Framework.Gui.Chat.PrintError(s);
-
-        public void SetupServices(DalamudPluginInterface pluginInterface)
+        public void SetupServices()
         {
-            Service<DalamudPluginInterface>.Set(pluginInterface);
-
             // Addresses.
-            Service<GetBaseUiObject>.Set(pluginInterface.TargetModuleScanner);
-            Service<GetUiObjectByName>.Set(pluginInterface.TargetModuleScanner);
-            Service<InputKey>.Set(pluginInterface.TargetModuleScanner);
-            Service<SelectStringOnSetup>.Set(pluginInterface.TargetModuleScanner);
-            Service<TalkOnUpdate>.Set(pluginInterface.TargetModuleScanner);
-            Service<TextErrorOnChange>.Set(pluginInterface.TargetModuleScanner);
-            Service<YesNoOnSetup>.Set(pluginInterface.TargetModuleScanner);
+            Service<GetBaseUiObject>.Set(Dalamud.SigScanner);
+            Service<GetUiObjectByName>.Set(Dalamud.SigScanner);
+            Service<InputKey>.Set(Dalamud.SigScanner);
+            Service<SelectStringOnSetup>.Set(Dalamud.SigScanner);
+            Service<TalkOnUpdate>.Set(Dalamud.SigScanner);
+            Service<TextErrorOnChange>.Set(Dalamud.SigScanner);
+            Service<YesNoOnSetup>.Set(Dalamud.SigScanner);
         }
 
-        public void Initialize(DalamudPluginInterface pluginInterface)
+        public Peon(DalamudPluginInterface pluginInterface)
         {
-            try
+            Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? string.Empty;
+
+            Dalamud.Initialize(pluginInterface);
+            DebuggerCheck = new DebuggerCheck(Dalamud.SigScanner);
+            DebuggerCheck.NopOut();
+
+            Localization = new Localization();
+            LazyString.SetLocalization(Localization);
+            Config = PeonConfiguration.Load();
+
+            Interface = new Interface(this);
+            SetupServices();
+            InterfaceManager = new InterfaceManager();
+            Addons           = new AddonWatcher();
+            InputManager     = new InputManager();
+            Targeting        = new TargetManager(InputManager, Addons);
+            OhBother         = new BotherHelper(Addons);
+            Retainers        = new RetainerManager(Targeting, Addons!, OhBother, InterfaceManager!);
+            Login            = new LoginManager(OhBother, InterfaceManager!);
+            Chocobos         = new ChocoboManager(Targeting, Addons, OhBother, InterfaceManager);
+            Commands         = new CommandManager(Dalamud.SigScanner);
+            Crafter          = new Crafter(Commands, InterfaceManager, false);
+            BaseAddress      = Dalamud.SigScanner.Module.BaseAddress.ToInt64();
+            LoginBar         = new LoginBar(Login, InterfaceManager);
+
+            _itemSheet = Dalamud.GameData.GetExcelSheet<Item>()!;
+            _items     = new Dictionary<string, (Item, byte)>((int) _itemSheet.RowCount);
+            var shopSheet = Dalamud.GameData.GetExcelSheet<GilShopItem>()!;
+            foreach (var i in _itemSheet)
+                _items[i.Name.ToString().ToLowerInvariant()] = (i, 0);
+
+            var recipeSheet = Dalamud.GameData.GetExcelSheet<Recipe>()!;
+            _recipes = new Dictionary<string, Recipe>((int) recipeSheet.RowCount);
+            foreach (var r in recipeSheet)
+                _recipes[r.ItemResult.Value!.Name.ToString().ToLowerInvariant()] = r;
+
+            Dalamud.Commands.AddHandler("/retainer", new CommandInfo(OnRetainer)
             {
-                Version          = Assembly.GetExecutingAssembly().GetName().Version.ToString();
-                _pluginInterface = pluginInterface;
-                _localization    = new Localization(_pluginInterface);
-                LazyString.SetLocalization(_localization);
-                _configuration = _pluginInterface.GetPluginConfig() as PeonConfiguration ?? new PeonConfiguration();
-                _interface     = new Interface(this, _pluginInterface, _configuration);
-                SetupServices(_pluginInterface);
-                _interfaceManager = new InterfaceManager(pluginInterface);
-                _addons           = new AddonWatcher(pluginInterface);
-                _inputManager     = new InputManager();
-                _targeting        = new TargetManager(pluginInterface, _inputManager, _addons);
-                _ohBother         = new BotherHelper(_pluginInterface, _addons, _configuration);
-                _retainers        = new RetainerManager(_pluginInterface, _targeting, _addons!, _ohBother, _interfaceManager!);
-                _login            = new LoginManager(_pluginInterface, _ohBother, _interfaceManager!);
-                _chocobos         = new ChocoboManager(_pluginInterface, _targeting, _addons, _ohBother, _interfaceManager);
-                _commands         = new CommandManager(_pluginInterface);
-                _crafter          = new Crafter(_pluginInterface, _configuration, _commands, _interfaceManager, false);
-                BaseAddress       = _pluginInterface.TargetModuleScanner.Module.BaseAddress.ToInt64();
-                _loginBar         = new LoginBar(_pluginInterface, _configuration, _login, _interfaceManager);
+                HelpMessage = "Send Retainers, either 'all' or a comma-separated list of indices.",
+                ShowInHelp  = true,
+            });
 
-                _pluginInterface.SavePluginConfig(_configuration);
-
-                _pluginInterface.CommandManager.AddHandler("/retainer", new CommandInfo(OnRetainer)
-                {
-                    HelpMessage = "Send Retainers, either 'all' or a comma-separated list of indices.",
-                    ShowInHelp  = true,
-                });
-
-                _pluginInterface.CommandManager.AddHandler("/login", new CommandInfo(OnLogin)
-                {
-                    HelpMessage =
-                        "Log from your current character to another character on the same server. Use \"/login next\" or \"/login previous\" to log to the next or previous character in the list.",
-                    ShowInHelp = true,
-                });
-
-                _pluginInterface.CommandManager.AddHandler("/craft", new CommandInfo(OnCraft)
-                {
-                    HelpMessage =
-                        "Log from your current character to another character on the same server. Use \"/login next\" or \"/login previous\" to log to the next or previous character in the list.",
-                    ShowInHelp = true,
-                });
-
-                _pluginInterface.CommandManager.AddHandler("/peon", new CommandInfo(OnPeon)
-                {
-                    HelpMessage =
-                        "",
-                    ShowInHelp = true,
-                });
-            }
-            catch (Exception e)
+            Dalamud.Commands.AddHandler("/login", new CommandInfo(OnLogin)
             {
-                PluginLog.Error($"{e}");
-            }
+                HelpMessage =
+                    "Log from your current character to another character on the same server. Use \"/login next\" or \"/login previous\" to log to the next or previous character in the list.",
+                ShowInHelp = true,
+            });
+
+            Dalamud.Commands.AddHandler("/craft", new CommandInfo(OnCraft)
+            {
+                HelpMessage =
+                    "Log from your current character to another character on the same server. Use \"/login next\" or \"/login previous\" to log to the next or previous character in the list.",
+                ShowInHelp = true,
+            });
+
+            Dalamud.Commands.AddHandler("/peon", new CommandInfo(OnPeon)
+            {
+                HelpMessage = "",
+                ShowInHelp  = true,
+            });
+
+            Dalamud.Commands.AddHandler("/recipe", new CommandInfo(OnRecipe)
+            {
+                HelpMessage = "",
+                ShowInHelp  = true,
+            });
+
+            Dalamud.Commands.AddHandler("/dev", new CommandInfo(OnDev)
+            {
+                HelpMessage = "",
+                ShowInHelp  = false,
+            });
+
+            Hooks.SetHooks();
         }
 
         public void Dispose()
         {
-            _loginBar?.Dispose();
-            _ohBother?.Dispose();
-            _addons?.Dispose();
-            _interfaceManager?.Dispose();
-            _interface?.Dispose();
-            _pluginInterface!.CommandManager.RemoveHandler("/retainer");
-            _pluginInterface!.CommandManager.RemoveHandler("/peon");
-            _pluginInterface!.CommandManager.RemoveHandler("/login");
-            _pluginInterface!.CommandManager.RemoveHandler("/craft");
-            _pluginInterface!.Dispose();
+            Hooks.Dispose();
+            LoginBar?.Dispose();
+            OhBother?.Dispose();
+            Addons?.Dispose();
+            InterfaceManager?.Dispose();
+            Interface?.Dispose();
+            Dalamud.Commands.RemoveHandler("/recipe");
+            Dalamud.Commands.RemoveHandler("/retainer");
+            Dalamud.Commands.RemoveHandler("/peon");
+            Dalamud.Commands.RemoveHandler("/login");
+            Dalamud.Commands.RemoveHandler("/craft");
+            Dalamud.Commands.RemoveHandler("/dev");
+            DebuggerCheck.Dispose();
         }
 
-        private int[] ParseIndices(string text)
+        private void OnDev(string command, string arguments)
+        {
+            var split = arguments.Split(new[]
+            {
+                ' ',
+            }, 2);
+            if (arguments.Length < 2)
+                Dalamud.Chat.Print("Please use with [sig|off|abs|hooks] [<Signature>|<Absolute Address>|<Offset>|<On|Off>].");
+            switch (split[0].ToLowerInvariant())
+            {
+                case "sig":
+                    ProgramHelper.ScanSig(split[1].Trim());
+                    return;
+                case "off":
+                    if (IntPtr.TryParse(split[1].Trim(), out var ptr))
+                        ProgramHelper.PrintOffset(ptr);
+                    else
+                        Dalamud.Chat.PrintError($"Could not parse {split[1]} as a pointer.");
+                    return;
+                case "abs":
+                    if (int.TryParse(split[1].Trim(), out var offset))
+                        ProgramHelper.PrintAbsolute(offset);
+                    else
+                        Dalamud.Chat.PrintError($"Could not parse {split[1]} as an integer.");
+                    return;
+                case "hooks":
+                    switch (split[1].ToLowerInvariant())
+                    {
+                        case "on":
+                            Hooks.EnableAll();
+                            return;
+                        case "off":
+                            Hooks.DisableAll();
+                            return;
+                        default:
+                            Dalamud.Chat.PrintError("Use hooks with On or Off.");
+                            return;
+                    }
+                default:
+                    Dalamud.Chat.Print("Please use with [sig|off] [<Signature>|<Absolute Address>].");
+                    return;
+            }
+        }
+
+        private static int[] ParseIndices(string text)
         {
             var split = text.Split(',');
             if (!split.Any())
@@ -158,12 +229,58 @@ namespace Peon
             ' ',
         };
 
+        private readonly ExcelSheet<Item>                 _itemSheet;
+        private readonly Dictionary<string, (Item, byte)> _items;
+        private readonly Dictionary<string, Recipe>       _recipes;
+
+        private void OnRecipe(string command, string arguments)
+        {
+            if (!arguments.Any())
+            {
+                Print("Please enter recipe name.");
+                return;
+            }
+
+            void PrintItem(string pre, Item it, byte sold)
+                => Print(
+                    $"{pre}{it.Name:32}{(it.IsUntradable ? " - Untradable" : "")}{(sold == 1 ? $"- {it.PriceMid} gil{(sold == 2 ? "*" : "")}." : " - Not sold.")}")
+            ;
+
+            void PrintRecipe(string pre, Recipe r)
+            {
+                PrintItem(pre, r.ItemResult.Value!, _items[r.ItemResult.Value!.Name.ToString().ToLowerInvariant()].Item2);
+                foreach (var mat in r.UnkStruct5.Where(u => u.AmountIngredient > 0))
+                {
+                    var it = _itemSheet.GetRow((uint) mat.ItemIngredient)!;
+                    if (_recipes.TryGetValue(it.Name.ToString().ToLowerInvariant(), out var subr))
+                        PrintRecipe($"{pre} -- {mat.AmountIngredient} x ", subr);
+                    else
+                        PrintItem($"{pre} -- {mat.AmountIngredient} x ", it, _items[it.Name.ToString().ToLowerInvariant()].Item2);
+                }
+            }
+
+            var lower = arguments.ToLowerInvariant();
+            if (!_recipes.TryGetValue(lower, out var recipe))
+            {
+                if (!_items.TryGetValue(lower, out var item))
+                {
+                    Print($"Could not identify {arguments}.");
+                    return;
+                }
+
+                PrintItem("", item.Item1, item.Item2);
+                return;
+            }
+
+            PrintRecipe("", recipe);
+        }
+
         private void OnRetainer(string command, string arguments)
         {
             var argumentParts = arguments.ToLowerInvariant().Split(SplitParams, 3);
             if (argumentParts.Length > 0 && argumentParts[0] == "cancel" || argumentParts[0] == "stop")
             {
-                _retainers.Cancel();
+                Retainers.Cancel();
                 return;
             }
 
@@ -230,27 +347,22 @@ namespace Peon
             {
                 var indices = ParseIndices(argumentParts[0]);
                 if (indices.Any())
-                {
-                    _retainers.SetRetainers(indices);
-                    type = RetainerType.Indices;
-                }
+                    Retainers.SetRetainers(indices);
                 else
-                {
-                    _retainers.SetRetainer(new CompareString(argumentParts[0], MatchType.CiContains));
-                }
+                    Retainers.SetRetainer(new CompareString(argumentParts[0], MatchType.CiContains));
             }
             else
             {
-                _retainers.SetRetainer(type);
+                Retainers.SetRetainer(type);
             }
 
             switch (argumentParts[1])
             {
                 case "resend":
-                    _retainers.DoAllRetainers(RetainerMode.ResendWithGil);
+                    Retainers.DoAllRetainers(RetainerMode.ResendWithGil);
                     break;
                 case "fetch":
-                    _retainers.DoAllRetainers(RetainerMode.LootWithGil);
+                    Retainers.DoAllRetainers(RetainerMode.LootWithGil);
                     break;
                 case "send":
                     if (argumentParts.Length < 3)
@@ -261,7 +373,7 @@ namespace Peon
 
                     if (argumentParts[2] == "quick")
                         argumentParts[2] = "quick exploration";
-                    _retainers.DoAllRetainers(RetainerMode.LootNewVentureWithGil, argumentParts[2]);
+                    Retainers.DoAllRetainers(RetainerMode.LootNewVentureWithGil, argumentParts[2]);
 
                     break;
                 default:
@@ -280,13 +392,13 @@ namespace Peon
 
             if (arguments == "cancel")
             {
-                _crafter.Cancel();
+                Crafter.Cancel();
                 return;
             }
 
             var split = arguments.Split(',');
 
-            if (!_configuration.CraftingMacros.TryGetValue(split[0], out var macro))
+            if (!Config.CraftingMacros.TryGetValue(split[0], out var macro))
             {
                 Print($"{arguments} is not a valid macro name.");
                 return;
@@ -310,15 +422,16 @@ namespace Peon
             {
                 for (var i = 0; i < amount; ++i)
                 {
-                    _crafter.RestartCraft();
-                    await _crafter.CompleteCraft(macro);
+                    Crafter.RestartCraft();
+                    await Crafter.CompleteCraft(macro);
                     if (i != amount - 1)
                     {
-                        var task = _interfaceManager.Add("RecipeNote", true, 5000);
+                        var task = InterfaceManager.Add("RecipeNote", true, 5000);
                         task.Wait();
                         if (!task.IsCompleted || task.Result == IntPtr.Zero)
                         {
-                            _pluginInterface.Framework.Gui.Chat.PrintError($"Terminated after {i}/{amount} crafts, Crafting Log did not reopen.");
+                            Dalamud.Chat.PrintError(
+                                $"Terminated after {i}/{amount} crafts, Crafting Log did not reopen.");
                             break;
                         }
                     }
@@ -335,14 +448,14 @@ namespace Peon
                     Print("Use with a (partial) character name, \"next\", or \"previous\".");
                     return;
                 case "next":
-                    _login.NextCharacter(defaultTimeOut);
+                    Login.NextCharacter(defaultTimeOut);
                     return;
                 case "previous":
                 case "prev":
-                    _login.PreviousCharacter(defaultTimeOut);
+                    Login.PreviousCharacter(defaultTimeOut);
                     return;
                 default:
-                    _login.LogTo(arguments, defaultTimeOut);
+                    Login.LogTo(arguments, defaultTimeOut);
                     return;
             }
         }
@@ -352,21 +465,21 @@ namespace Peon
             var argumentParts = arguments.Split(',');
             if (arguments == string.Empty || argumentParts.Length < 1)
             {
-                _interface.SetVisible();
+                Interface.SetVisible();
                 return;
             }
 
             switch (argumentParts[0])
             {
                 case "cancel":
-                    _retainers!.Cancel();
+                    Retainers!.Cancel();
                     break;
                 case "allturnin":
                     Task.Run(() =>
                     {
                         Task.Run(() =>
                         {
-                            var ptr = _pluginInterface.Framework.Gui.GetUiObjectByName("GrandCompanySupplyList", 1);
+                            var ptr = Dalamud.GameGui.GetAddonByName("GrandCompanySupplyList", 1);
                             if (ptr == IntPtr.Zero)
                                 return;
 
@@ -374,14 +487,14 @@ namespace Peon
                             while (s.Count > 0)
                             {
                                 s.Select(0);
-                                var task = _interfaceManager.Add("GrandCompanySupplyReward", false, 3000);
+                                var task = InterfaceManager.Add("GrandCompanySupplyReward", false, 3000);
                                 task.SafeWait();
                                 if (task.IsCanceled)
                                     return;
 
                                 ((PtrGrandCompanySupplyReward) task.Result).Deliver();
                                 Task.Delay(75).Wait();
-                                task = _interfaceManager.Add("GrandCompanySupplyList", false, 3000);
+                                task = InterfaceManager.Add("GrandCompanySupplyList", false, 3000);
                                 task.SafeWait();
                                 if (task.IsCanceled)
                                     return;
@@ -392,7 +505,7 @@ namespace Peon
                     });
                     break;
                 case "chocobo":
-                    _chocobos.FeedAllChocobos();
+                    Chocobos.FeedAllChocobos();
                     break;
             }
         }

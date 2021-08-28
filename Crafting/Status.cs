@@ -1,8 +1,4 @@
-﻿using System;
-using System.Security.AccessControl;
-using Dalamud.Game.Command;
-
-namespace Peon.Crafting
+﻿namespace Peon.Crafting
 {
     public enum Status
     {

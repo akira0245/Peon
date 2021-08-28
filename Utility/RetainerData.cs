@@ -1,5 +1,4 @@
 ﻿using FFXIVClientStructs.FFXIV.Component.GUI;
-using Peon.Crafting;
 using Peon.Managers;
 using Peon.Modules;
 

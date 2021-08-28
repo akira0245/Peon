@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Dalamud;
-using Dalamud.Plugin;
+using Dalamud.Logging;
 using Lumina.Excel.GeneratedSheets;
 
 namespace Peon.Managers
@@ -264,9 +264,9 @@ namespace Peon.Managers
             };
         }
 
-        private static Dictionary<uint, byte> ExplorationsToItem(DalamudPluginInterface pi)
+        private static Dictionary<uint, byte> ExplorationsToItem()
         {
-            var  randomTasks      = pi.Data.GetExcelSheet<RetainerTaskRandom>(ClientLanguage.English);
+            var  randomTasks      = Dalamud.GameData.GetExcelSheet<RetainerTaskRandom>(ClientLanguage.English)!;
             var  ret              = new Dictionary<uint, byte>((int) randomTasks.RowCount);
             byte watersideCounter = 0;
             byte woodlandCounter  = 0;
@@ -326,20 +326,20 @@ namespace Peon.Managers
                     return v1.CompareTo(v2);
                 else
                     return -1;
-            else if (TaskSorting.TryGetValue(t2.RowId, out var v2))
+            else if (TaskSorting.TryGetValue(t2.RowId, out var _))
                 return 1;
             else
                 return t1.RowId.CompareTo(t2.RowId);
         }
 
-        public RetainerIdentifier(DalamudPluginInterface pi)
+        public RetainerIdentifier()
         {
-            var tasks        = pi.Data.GetExcelSheet<RetainerTask>();
-            var normalTasks  = pi.Data.GetExcelSheet<RetainerTaskNormal>();
-            var randomTasks  = pi.Data.GetExcelSheet<RetainerTaskRandom>(pi.ClientState.ClientLanguage);
-            var items        = pi.Data.GetExcelSheet<Item>(pi.ClientState.ClientLanguage);
-            var levelRanges  = pi.Data.GetExcelSheet<RetainerTaskLvRange>();
-            var explorations = ExplorationsToItem(pi);
+            var tasks        = Dalamud.GameData.GetExcelSheet<RetainerTask>()!;
+            var normalTasks  = Dalamud.GameData.GetExcelSheet<RetainerTaskNormal>()!;
+            var randomTasks  = Dalamud.GameData.GetExcelSheet<RetainerTaskRandom>(Dalamud.ClientState.ClientLanguage)!;
+            var items        = Dalamud.GameData.GetExcelSheet<Item>(Dalamud.ClientState.ClientLanguage)!;
+            var levelRanges  = Dalamud.GameData.GetExcelSheet<RetainerTaskLvRange>()!;
+            var explorations = ExplorationsToItem();
 
             var counters = new Dictionary<RetainerJob, List<RetainerTask>[]>(4)
             {
@@ -362,7 +362,7 @@ namespace Peon.Managers
                 }
                 else
                 {
-                    var name = randomTasks.GetRow(task.Task).Name.ToString().ToLowerInvariant();
+                    var name = randomTasks.GetRow(task.Task)!.Name.ToString().ToLowerInvariant();
                     var taskInfo = new RetainerTaskInfo
                     {
                         Category   = (byte) (task.Task == 30053 ? 2 : 1),
@@ -383,7 +383,7 @@ namespace Peon.Managers
                     {
                         var task       = list[i];
                         var normalTask = normalTasks.GetRow(task.Task);
-                        var name       = items.GetRow(normalTask.Item.Row).Name.ToString().ToLowerInvariant();
+                        var name       = items.GetRow(normalTask!.Item.Row)!.Name.ToString().ToLowerInvariant();
                         var taskInfo = new RetainerTaskInfo()
                         {
                             Category   = 0,

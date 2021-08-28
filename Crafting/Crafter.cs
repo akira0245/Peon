@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Dalamud.Plugin;
+using Dalamud.Logging;
 using Peon.Managers;
 using Peon.Modules;
 
@@ -8,22 +8,18 @@ namespace Peon.Crafting
 {
     public class Crafter
     {
-        private readonly DalamudPluginInterface _pluginInterface;
         private readonly InterfaceManager       _interface;
         private readonly CommandManager         _commands;
-        private readonly PeonConfiguration      _config;
 
         public bool Verbose { get; set; }
 
-        private bool _running         = false;
-        private bool _basicTouchCombo = false;
-        private int  _currentStep     = 0;
+        private bool _running;
+        private bool _basicTouchCombo;
+        private int  _currentStep;
 
-        public Crafter(DalamudPluginInterface pi, PeonConfiguration config, CommandManager commandManager, InterfaceManager interfaceManager,
+        public Crafter(CommandManager commandManager, InterfaceManager interfaceManager,
             bool verbose)
         {
-            _pluginInterface = pi;
-            _config          = config;
             _commands        = commandManager;
             _interface       = interfaceManager;
             Verbose          = verbose;
@@ -33,7 +29,7 @@ namespace Peon.Crafting
         {
             PluginLog.Verbose(s);
             if (Verbose)
-                _pluginInterface.Framework.Gui.Chat.Print(s);
+                Dalamud.Chat.Print(s);
         }
 
         private ActionInfo Use(ActionId id)
@@ -43,10 +39,10 @@ namespace Peon.Crafting
             return action;
         }
 
-        private bool Error(string error)
+        private static bool Error(string error)
         {
             PluginLog.Error(error);
-            _pluginInterface.Framework.Gui.Chat.PrintError(error);
+            Dalamud.Chat.PrintError(error);
             return false;
         }
 
