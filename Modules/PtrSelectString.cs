@@ -7,7 +7,7 @@ using Peon.Bothers;
 
 namespace Peon.Modules
 {
-    // Also usable by SystemMenu
+    // Also usable by SystemMenu and SelectIconString
     public unsafe struct PtrSelectString
     {
         public AddonSelectString* Pointer;

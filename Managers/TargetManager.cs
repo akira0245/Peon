@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Logging;
@@ -29,19 +30,32 @@ namespace Peon.Managers
             _addons          = addons;
         }
 
+        private static float Distance(GameObject? o1)
+            => o1 == null ? float.MaxValue : o1.YalmDistanceX * o1.YalmDistanceX + o1.YalmDistanceZ * o1.YalmDistanceZ;
+
         public TargetingState Target(Predicate<GameObject> predicate)
         {
+            var         currentDistance = Distance(null);
+            GameObject? currentActor = null;
             foreach (var actor in Dalamud.Objects)
             {
                 if (!predicate(actor))
                     continue;
 
-                PluginLog.Verbose("Target set to actor {ActorId}: \"{ActorName}\".", actor.ObjectId, actor.Name);
-                Dalamud.Targets.SetTarget(actor);
-                return TargetingState.Success;
+                var dist = Distance(actor);
+                if (dist < currentDistance)
+                {
+                    currentDistance = dist;
+                    currentActor    = actor;
+                }
             }
 
-            return TargetingState.ActorNotFound;
+            if (currentDistance == float.MaxValue)
+                return TargetingState.ActorNotFound;
+
+            PluginLog.Verbose("Target set to actor {ActorId}: \"{ActorName}\".", currentActor!.ObjectId, currentActor!.Name);
+            Dalamud.Targets.SetTarget(currentActor!);
+            return TargetingState.Success;
         }
 
         public TargetingState Target(string targetName)
@@ -71,7 +85,7 @@ namespace Peon.Managers
         public Task<TargetingState> EnableRangeChecking(int timeOutFrames)
         {
             if (_state != null && !_state.Task.IsCompleted)
-                return _state.Task;
+                _state.SetCanceled();
 
             _state = new TaskCompletionSource<TargetingState>();
             if (timeOutFrames <= 0)

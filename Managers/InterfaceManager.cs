@@ -62,15 +62,22 @@ namespace Peon.Managers
         // @formatter:off
         public PtrBank                     Bank()                     => GetUiObject("Bank");
         public PtrCharaSelectListMenu      CharaSelectListMenu()      => GetUiObject("CharaSelectListMenu");
+        public PtrContextIconMenu          ContextIconMenu()          => GetUiObject("ContextIconMenu");
+        public PtrFocusTarget              FocusTarget()              => GetUiObject("_FocusTargetInfo");
         public PtrGrandCompanySupplyList   GrandCompanySupplyList()   => GetUiObject("GrandCompanySupplyList");
         public PtrGrandCompanySupplyReward GrandCompanySupplyReward() => GetUiObject("GrandCompanySupplyReward");
         public PtrHousingChocoboList       HousingChocoboList()       => GetUiObject("HousingChocoboList");
+        public PtrHousingSignBoard         HousingSignBoard()         => GetUiObject("HousingSignBoard");
         public PtrInventoryGrid            InventoryGrid(int idx)     => GetUiObject($"InventoryGrid{idx:D1}E");
+        public PtrJournal                  Journal()                  => GetUiObject("JournalDetail");
+        public PtrJournalResult            JournalResult()            => GetUiObject("JournalResult");
         public PtrRecipeNote               RecipeNote()               => GetUiObject("RecipeNote");
+        public PtrRequest                  Request()                  => GetUiObject("Request");
         public PtrRetainerList             RetainerList()             => GetUiObject("RetainerList");
         public PtrRetainerTaskAsk          RetainerTaskAsk()          => GetUiObject("RetainerTaskAsk");
         public PtrRetainerTaskList         RetainerTaskList()         => GetUiObject("RetainerTaskList");
         public PtrRetainerTaskResult       RetainerTaskResult()       => GetUiObject("RetainerTaskResult");
+        public PtrSelectString             SelectIconString()         => GetUiObject("SelectIconString");
         public PtrSelectString             SelectString()             => GetUiObject("SelectString");
         public PtrSelectYesno              SelectYesno()              => GetUiObject("SelectYesno");
         public PtrSynthesis                Synthesis()                => GetUiObject("Synthesis");

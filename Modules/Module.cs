@@ -106,11 +106,22 @@ namespace Peon.Modules
             return Marshal.GetDelegateForFunctionPointer<ReceiveEventDelegate>(new IntPtr(ptr));
         }
 
-        public static void ClickAddon(void* addon, void* target, EventType type, int which, void* eventData)
+        public static void ClickAddon(void* addon, void* target, EventType type, int which, void* eventData, void* helper)
         {
             var       receiveEvent = ObtainReceiveEventDelegate(addon);
+            receiveEvent(addon, (ushort)type, which, helper, eventData);
+        }
+
+        public static void ClickAddon(void* addon, void* target, EventType type, int which, void* eventData)
+        {
             using var helper       = new ClickHelper(addon, target);
-            receiveEvent(addon, (ushort) type, which, helper.Data, eventData);
+            ClickAddon(addon, target, type, which, eventData, helper.Data);
+        }
+
+        public static void ClickAddonHelper(void* addon, void* target, EventType type, int which, void* helper)
+        {
+            using var eventData = EventData.CreateEmpty();
+            ClickAddon(addon, target, type, which, eventData.Data, helper);
         }
 
         public static void ClickAddon(void* addon, void* target, EventType type, int which)

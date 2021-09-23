@@ -92,4 +92,18 @@ namespace Peon.Bothers
         public bool MainMatches(string text)
             => _mainString.Matches(text);
     }
+
+    public class AlternatingBotherSet
+    {
+        public SelectBotherSet[] Bothers;
+
+        [JsonIgnore]
+        public int CurrentSet;
+
+        public AlternatingBotherSet(params SelectBotherSet[] sets)
+        {
+            Bothers    = sets;
+            CurrentSet = 0;
+        }
+    }
 }

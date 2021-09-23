@@ -64,6 +64,7 @@ namespace Peon.Gui
 
         private string _newYesNo  = string.Empty;
         private string _newTalk   = string.Empty;
+        private string _newQuest  = string.Empty;
         private string _newSelect = string.Empty;
 
         private float _rowSize;
@@ -178,6 +179,44 @@ namespace Peon.Gui
             }
         }
 
+        private void DrawQuestBothers()
+        {
+            using ImGuiRaii imgui = new();
+            if (!imgui.Begin(() => ImGui.BeginTabItem("Quest Bothers"), ImGui.EndTabItem))
+                return;
+
+            _rowSize = (LongestMatchText + LongestTalkText + ButtonWidth) * ImGui.GetIO().FontGlobalScale + 3 * ImGui.GetStyle().ItemSpacing.X;
+            for (var idx = 0; idx < Peon.Config.BothersQuest.Count; ++idx)
+            {
+                var bother = Peon.Config.BothersQuest[idx];
+
+                var changes = DrawBotherTextInput($"##questText{idx}", bother.Text, out var text);
+                ImGui.SameLine();
+                changes |= DrawMatchCombo($"##questMatch{idx}", bother.MatchType, out var match);
+                ImGui.SameLine();
+                changes |= DrawYesNoCheckbox($"##questEnabled{idx}", bother.Enabled, out var enabled);
+                ImGui.SameLine();
+                if (DrawDeleteButton($"##questTrash{idx}"))
+                {
+                    Peon.Config.BothersQuest.RemoveAt(idx);
+                    --idx;
+                    Save();
+                }
+                else if (changes)
+                {
+                    Peon.Config.BothersQuest[idx] = new QuestBotherSet(text, match, enabled);
+                    Save();
+                }
+            }
+
+            if (DrawNewTextInput("##questNew", ref _newQuest))
+            {
+                Peon.Config.BothersQuest.Add(new QuestBotherSet(_newQuest, MatchType.Equal, false));
+                Save();
+                _newQuest = string.Empty;
+            }
+        }
+
 
         private void DrawYesNoBothers()
         {
@@ -265,6 +304,92 @@ namespace Peon.Gui
             if (DrawNewTextInput("##selectNew", ref _newSelect))
             {
                 Peon.Config.BothersSelect.Add(new SelectBotherSet(_newSelect, MatchType.Equal) { Source = SelectSource.Disabled });
+                Save();
+                _newSelect = string.Empty;
+            }
+        }
+
+        private bool DrawAddButton(string label)
+        {
+            ImGui.PushFont(UiBuilder.IconFont);
+            var value = ImGui.Button($"{FontAwesomeIcon.Plus.ToIconChar()}{label}");
+            ImGui.PopFont();
+            return value;
+        }
+
+        private void DrawAlternatingBothers()
+        {
+            using ImGuiRaii imgui = new();
+            if (!imgui.Begin(() => ImGui.BeginTabItem("Alternating Bothers"), ImGui.EndTabItem))
+                return;
+
+            _rowSize = (LongestMatchText + LongestSelectText + ButtonWidth) * ImGui.GetIO().FontGlobalScale
+              + 3 * ImGui.GetStyle().ItemSpacing.X;
+            for (var idx = 0; idx < Peon.Config.BothersAlternatingSelect.Count; ++idx)
+            {
+                var botherGroup = Peon.Config.BothersAlternatingSelect[idx];
+                if (!ImGui.BeginChild($"##AselectGroup{idx}", 
+                    Vector2.UnitY * (2 * (ImGui.GetStyle().FramePadding.Y + ImGui.GetStyle().ItemSpacing.Y) + ImGui.GetFrameHeightWithSpacing() * 2 * botherGroup.Bothers.Length), true))
+                {
+                    ImGui.EndChild();
+                    continue;
+                }
+
+                for (var jdx = 0; jdx < botherGroup.Bothers.Length; ++jdx)
+                {
+                    var bother  = botherGroup.Bothers[jdx];
+                    var changes = DrawBotherTextInput($"##AselectSText{idx}_{jdx}", bother.SelectionText, out var selectionText);
+                    ImGui.SameLine();
+                    changes |= DrawMatchCombo($"##AselectSMatch{idx}_{jdx}", bother.SelectionMatchType, out var selectionMatch);
+                    ImGui.SameLine();
+                    changes |= DrawSourceCombo($"##AselectSource{idx}_{jdx}", bother.Source, out var source);
+                    ImGui.SameLine();
+                    if (DrawDeleteButton($"##AselectTrash{idx}_{jdx}"))
+                    {
+                        botherGroup.Bothers = botherGroup.Bothers.Where((_, i) => i != jdx).ToArray();
+                        --jdx;
+                        if (!botherGroup.Bothers.Any())
+                        {
+                            Peon.Config.BothersAlternatingSelect.RemoveAt(idx);
+                            --idx;
+                            Save();
+                            break;
+                        }
+
+                        Save();
+                        continue;
+                    }
+
+                    ImGui.Indent();
+                    changes |= DrawBotherTextInput($"##AselectMText{idx}_{jdx}", bother.MainText, out var mainText);
+                    ImGui.SameLine();
+                    changes |= DrawMatchCombo($"##AselectMMatch{idx}_{jdx}", bother.MainMatchType, out var mainMatch);
+                    ImGui.SameLine();
+                    changes |= DrawIndexInput($"##AselectIndex{idx}_{jdx}", bother.Index, out var index);
+                    ImGui.SameLine();
+                    if (DrawAddButton($"##AselectAdd{idx}_{jdx}"))
+                    {
+                        botherGroup.Bothers = botherGroup.Bothers.Take(jdx + 1)
+                           .Append(new SelectBotherSet(string.Empty, MatchType.Equal))
+                           .Concat(botherGroup.Bothers.Skip(jdx + 1)).ToArray();
+                        changes = true;
+                    }
+                    ImGui.Unindent();
+
+                    if (changes)
+                    {
+                        botherGroup.Bothers[jdx] =
+                            new SelectBotherSet(selectionText, selectionMatch, index, mainText, mainMatch) { Source = source };
+                        Save();
+                    }
+                }
+
+                ImGui.EndChild();
+            }
+
+            if (DrawNewTextInput("##AselectNew", ref _newSelect))
+            {
+                Peon.Config.BothersAlternatingSelect.Add(new AlternatingBotherSet(new SelectBotherSet(_newSelect, MatchType.Equal) { Source = SelectSource.Disabled }));
                 Save();
                 _newSelect = string.Empty;
             }
@@ -435,7 +560,10 @@ namespace Peon.Gui
 
             ImGui.SetNextWindowSizeConstraints(minSize, Vector2.One * 10000);
             if (!ImGui.Begin(_header, ref _visible))
+            {
+                ImGui.End();
                 return;
+            }
 
             try
             {
@@ -445,8 +573,10 @@ namespace Peon.Gui
 
                 DrawPeonConfig();
                 DrawTalkBothers();
+                DrawQuestBothers();
                 DrawYesNoBothers();
                 DrawSelectBothers();
+                DrawAlternatingBothers();
                 DrawMacros();
                 DrawLoginButtonConfig();
                 DrawDebug();

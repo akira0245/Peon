@@ -30,6 +30,22 @@ namespace Peon.Managers
         StablesOpen     = 3,
         InventoryOpen   = 4,
 
+        // Board
+        BoardPlacardOpen = 1,
+        BoardBuyerSelect = 2,
+        BoardWait        = 3,
+
+        // TurnIn
+        TurnInSelectLeveKindOpen = 1,
+        TurnInJournalOpen = 2,
+        TurnInQuestAccepted = 3,
+        TurnInSelectTurnInOpen = 4,
+        TurnInRequestOpen = 5,
+        TurnInRequestIconOpen = 6,
+        TurnInRequestFilled = 7,
+        TurnInJournalResultOpen = 8,
+        TurnInRepeatOrStop = 9,
+
         JobFinished = 100,
     }
 
@@ -56,18 +72,18 @@ namespace Peon.Managers
             Dalamud.Chat.Print("Cancellation of current job requested.");
         }
 
-        protected void Wait<T>(Task<T> task)
+        protected void Wait<T>(Task<T> task, int timeOut = Timeout.Infinite)
         {
             try
             {
-                task.Wait(CancelToken!.Token);
+                task.Wait(timeOut, CancelToken!.Token);
             }
             catch (OperationCanceledException)
             { }
         }
 
-        protected void Wait(Task task)
-            => task.Wait(CancelToken!.Token);
+        protected void Wait(Task task, int timeOut = Timeout.Infinite)
+            => task.Wait(timeOut, CancelToken!.Token);
 
         protected virtual WorkState SetInitialState()
             => throw new NotImplementedException();
@@ -77,6 +93,12 @@ namespace Peon.Managers
             State     = WorkState.Error;
             ErrorText = text;
             return false;
+        }
+
+        protected bool Retry()
+        {
+            State = SetInitialState();
+            return true;
         }
 
         protected WorkManager(TargetManager target, AddonWatcher addons, BotherHelper bothers,

@@ -1,15 +1,56 @@
 ﻿using System;
+using System.Runtime.InteropServices;
+using Dalamud.Logging;
+using FFXIVClientStructs.FFXIV.Client.System.Resource.Handle;
 using Peon.Utility;
 
 namespace Peon
 {
-    public static class HookManagerExtension
+    public static unsafe class HookManagerExtension
     {
         private delegate IntPtr Delegate2Ptr_Ptr(IntPtr a1, IntPtr a2);
+        private delegate IntPtr Delegate2PtrInt_Ptr(IntPtr a1, IntPtr a2, uint a3);
+        private delegate void   DelegateReceiveEvent(IntPtr atkUnit, ushort eventType, int which, IntPtr source, IntPtr unused);
+        private delegate IntPtr Delegate4Ptr_Ptr(IntPtr a1, IntPtr a2, IntPtr a3, IntPtr a4);
+        private delegate IntPtr DelegatePtr_Ptr(IntPtr a1);
+        private delegate void   DelegatePtr(IntPtr a1);
 
         public static void SetHooks(this HookManager hooks)
         {
-            hooks.Create<Delegate2Ptr_Ptr>("ResourceUnload", 0x1B2E60, false);
+            hooks.Create<Delegate2Ptr_Ptr>("ResourceUnload", 0x1B2E60, false, (Func<IntPtr, IntPtr, bool>) ResourceUnloadCondition);
+            hooks.Create<Delegate2PtrInt_Ptr>("IncRef", 0x1A2500, false, (Func<IntPtr, IntPtr, uint, bool>) IncRefCondition);
+            hooks.Create<Delegate2PtrInt_Ptr>("DecRef", 0x1A24D0, false, (Func<IntPtr, IntPtr, uint, bool>) IncRefCondition);
+            hooks.Create<DelegateReceiveEvent>("ReceiveYesNoEvent", 0xCF1220, false, null, ReceiveEventData);
+            hooks.Create<DelegateReceiveEvent>("ReceiveMainEvent",  0xFFBB20, false, null, ReceiveEventData);
+            hooks.Create<DelegatePtr_Ptr>("MaybeCleanResources", 0x1B4200, false);
+            hooks.Create<DelegateReceiveEvent>("ReceiveHousingBoardEvent",  0x1058B40, false, null, ReceiveEventData);
+            hooks.Create<DelegateReceiveEvent>("ReceiveRequestEvent",       0xd0a210,  false, null, ReceiveEventData);
+            hooks.Create<DelegateReceiveEvent>("ReceiveJournalResultEvent", 0xDF9000,  false, null, ReceiveEventData);
+            hooks.Create<DelegateReceiveEvent>("ReceiveFocusTargetEvent",   0x101e6b0,  false, null, ReceiveEventData);
         }
+
+        private static unsafe bool IncRefCondition(IntPtr a1, IntPtr a2, uint a3)
+            => ((ResourceHandle*) a1)->FileName.ToString().EndsWith(".cmp");
+
+        private static bool ResourceUnloadCondition(IntPtr a1, IntPtr a2)
+        {
+            var counter = *(uint*) (a2 + 0xAC);
+            if (counter > 1)
+                return false;
+
+            var ext    = $"{(char) *((byte*) a2 + 0xE)}{(char) *((byte*) a2 + 0xD)}{(char) *((byte*) a2 + 0xC)}";
+            var length = *(uint*) (a2 + 0x58);
+            var file   = length > 15 ? Marshal.PtrToStringAnsi(*(IntPtr*) (a2 + 0x48)) : Marshal.PtrToStringAnsi(a2 + 0x48);
+            PluginLog.Information($"Resource Unload Counter {counter} {ext} {length} {file}");
+            return true;
+        }
+
+        private static DelegateReceiveEvent ReceiveEventData = (_, _, _, data, eventInfo) =>
+        {
+            PluginLog.Information(
+                $"Helper: [0] = {*(ulong*) (data + 0)}, [1] = {*(IntPtr*) (data + 8):X}, [2] = {*(IntPtr*) (data + 0x10):X}, [3] = {*(ulong*) (data + 0x18)}, [4] = {*(ulong*) (data + 0x20)}, [5] = {*(ulong*) (data + 0x28):X}, [6] = {*(IntPtr*) (data + 0x30):X}, [7] = {*(IntPtr*) (data + 0x38):X}");
+            PluginLog.Information(
+                $"Helper: [0] = {*(ulong*)(eventInfo + 0)}, [1] = {*(IntPtr*)(eventInfo + 8):X}, [2] = {*(IntPtr*)(eventInfo + 0x10):X}, [3] = {*(ulong*)(eventInfo + 0x18)}, [4] = {*(ulong*)(eventInfo + 0x20)}, [5] = {*(ulong*)(eventInfo + 0x28):X}, [6] = {*(IntPtr*)(eventInfo + 0x30):X}, [7] = {*(IntPtr*)(eventInfo + 0x38):X}");
+        };
     }
 }

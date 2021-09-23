@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Dalamud.Game.Command;
-using Dalamud.Hooking;
 using Dalamud.Plugin;
 using Lumina.Excel;
 using Lumina.Excel.GeneratedSheets;
@@ -45,14 +45,12 @@ namespace Peon
         public readonly Localization    Localization;
         public readonly DebuggerCheck   DebuggerCheck;
         public readonly HookManager     Hooks = new();
+        public readonly BoardManager    Board;
 
         public static long BaseAddress;
 
         private static void Print(string s)
             => Dalamud.Chat.Print(s);
-
-        private static void Error(string s)
-            => Dalamud.Chat.PrintError(s);
 
         public void SetupServices()
         {
@@ -64,9 +62,10 @@ namespace Peon
             Service<TalkOnUpdate>.Set(Dalamud.SigScanner);
             Service<TextErrorOnChange>.Set(Dalamud.SigScanner);
             Service<YesNoOnSetup>.Set(Dalamud.SigScanner);
+            Service<JournalResultOnSetup>.Set(Dalamud.SigScanner);
         }
 
-        public Peon(DalamudPluginInterface pluginInterface)
+        public unsafe Peon(DalamudPluginInterface pluginInterface)
         {
             Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? string.Empty;
 
@@ -92,6 +91,7 @@ namespace Peon
             Crafter          = new Crafter(Commands, InterfaceManager, false);
             BaseAddress      = Dalamud.SigScanner.Module.BaseAddress.ToInt64();
             LoginBar         = new LoginBar(Login, InterfaceManager);
+            Board            = new BoardManager(Targeting, Addons, OhBother, InterfaceManager);
 
             _itemSheet = Dalamud.GameData.GetExcelSheet<Item>()!;
             _items     = new Dictionary<string, (Item, byte)>((int) _itemSheet.RowCount);
@@ -133,7 +133,7 @@ namespace Peon
             Dalamud.Commands.AddHandler("/recipe", new CommandInfo(OnRecipe)
             {
                 HelpMessage = "",
-                ShowInHelp  = true,
+                ShowInHelp  = false,
             });
 
             Dalamud.Commands.AddHandler("/dev", new CommandInfo(OnDev)
@@ -142,7 +142,18 @@ namespace Peon
                 ShowInHelp  = false,
             });
 
+            Dalamud.Commands.AddHandler("/xlkill", new CommandInfo(OnKill)
+            {
+                HelpMessage = "",
+                ShowInHelp  = false,
+            });
+
             Hooks.SetHooks();
+        }
+
+        private static void OnKill(string command, string _)
+        {
+            Process.GetCurrentProcess().Kill();
         }
 
         public void Dispose()
@@ -159,10 +170,11 @@ namespace Peon
             Dalamud.Commands.RemoveHandler("/login");
             Dalamud.Commands.RemoveHandler("/craft");
             Dalamud.Commands.RemoveHandler("/dev");
+            Dalamud.Commands.RemoveHandler("/xlkill");
             DebuggerCheck.Dispose();
         }
 
-        private void OnDev(string command, string arguments)
+        private unsafe void OnDev(string command, string arguments)
         {
             var split = arguments.Split(new[]
             {
@@ -172,6 +184,16 @@ namespace Peon
                 Dalamud.Chat.Print("Please use with [sig|off|abs|hooks] [<Signature>|<Absolute Address>|<Offset>|<On|Off>].");
             switch (split[0].ToLowerInvariant())
             {
+                case "test":
+                {
+                    var focus = InterfaceManager.FocusTarget();
+                    if (!focus)
+                        return;
+
+                    Dalamud.Chat.Print(focus.TargetName());
+                    focus.Interact();
+                    break;
+                }
                 case "sig":
                     ProgramHelper.ScanSig(split[1].Trim());
                     return;
@@ -188,20 +210,30 @@ namespace Peon
                         Dalamud.Chat.PrintError($"Could not parse {split[1]} as an integer.");
                     return;
                 case "hooks":
-                    switch (split[1].ToLowerInvariant())
+                    split = split[1].Split(new[]
+                    {
+                        ' ',
+                    }, 2);
+                    switch (split[0].ToLowerInvariant())
                     {
                         case "on":
-                            Hooks.EnableAll();
+                            if (split.Length > 1)
+                                Hooks.Enable(split[1]);
+                            else
+                                Hooks.EnableAll();
                             return;
                         case "off":
-                            Hooks.DisableAll();
+                            if (split.Length > 1)
+                                Hooks.Disable(split[1]);
+                            else
+                                Hooks.DisableAll();
                             return;
                         default:
                             Dalamud.Chat.PrintError("Use hooks with On or Off.");
                             return;
                     }
                 default:
-                    Dalamud.Chat.Print("Please use with [sig|off] [<Signature>|<Absolute Address>].");
+                    Dalamud.Chat.Print("Please use with [sig|off|abs|hooks] [<Signature>|<Absolute Address>|<Offset>|<On|Off>].");
                     return;
             }
         }
@@ -473,6 +505,8 @@ namespace Peon
             {
                 case "cancel":
                     Retainers!.Cancel();
+                    Chocobos.Cancel();
+                    Board.Cancel();
                     break;
                 case "allturnin":
                     Task.Run(() =>
@@ -506,6 +540,12 @@ namespace Peon
                     break;
                 case "chocobo":
                     Chocobos.FeedAllChocobos();
+                    break;
+                case "buyplot":
+                    Board.StartBuying(50, 250, true, false, true);
+                    break;
+                case "buyplotkill":
+                    Board.StartBuying(150, 250, true, true);
                     break;
             }
         }

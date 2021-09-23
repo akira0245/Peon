@@ -40,9 +40,10 @@ namespace Peon.Utility
             var methods = typeof(DynamicHookBase).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance);
             var chosenMethod = methods.First(m
                 => methodInfo.ReturnType != typeof(void) == (m.ReturnType != typeof(void))
-             && methodInfo.GetParameters().Length == m.GetParameters().Length);
+             && methodInfo.GetParameters().Length == m.GetParameters().Length && m.Name.StartsWith("Detour"));
 
-            var types          = methodInfo.GetParameters().Select(p => p.ParameterType).Append(methodInfo.ReturnType).ToArray();
+            var it             = methodInfo.GetParameters().Select(p => p.ParameterType);
+            var types          = methodInfo.ReturnType == typeof(void) ? it.ToArray() : it.Append(methodInfo.ReturnType).ToArray();
             var specificMethod = chosenMethod.MakeGenericMethod(types);
             var detour         = (T) specificMethod.CreateDelegate(typeof(T), this);
 
@@ -126,24 +127,37 @@ namespace Peon.Utility
         protected virtual dynamic FullDetourRet(params dynamic?[] a)
             => throw new NotImplementedException();
 
-        protected void FullDetourBase(Delegate original, Delegate? pre, Delegate? post, params dynamic?[] a)
+        protected void FullDetourBase(Delegate original, Delegate? condition, Delegate? pre, Delegate? post, params dynamic?[] a)
         {
-            pre?.DynamicInvoke(a);
-            PluginLog.Information(a.Length == 0 ? $"{Name} called" : $"{Name} called with\n\t{ParamsToString(a)}");
+            var cond = condition == null || (bool) condition.DynamicInvoke(a)!;
+            if (cond)
+            {
+                pre?.DynamicInvoke(a);
+                PluginLog.Information(a.Length == 0 ? $"{Name} called" : $"{Name} called with\n\t{ParamsToString(a)}");
+            }
+
             original.DynamicInvoke(a);
-            pre?.DynamicInvoke(a);
+            if (cond)
+                post?.DynamicInvoke(a);
         }
 
-        protected dynamic FullDetourRetBase(Delegate original, Delegate? pre, Delegate? post, params dynamic?[] a)
+        protected dynamic FullDetourRetBase(Delegate original, Delegate? condition, Delegate? pre, Delegate? post, params dynamic?[] a)
         {
-            var s = ParamsToString(a);
-            pre?.DynamicInvoke(a);
+            var s    = ParamsToString(a);
+            var cond = condition == null || (bool) condition.DynamicInvoke(a)!;
+            if (cond)
+                pre?.DynamicInvoke(a);
             var ret = original.DynamicInvoke(a);
+
+            if (!cond)
+                return ret!;
+
             PluginLog.Information(s.Length == 0
                 ? $"{Name} called\n({ret!.GetType()}) ret = {ret}."
                 : $"{Name} called with\n\t{s}\n\t{(ret == null ? "ret == null" : $"({ret.GetType()}) ret = {ToString(ret)}")}");
 
             post?.DynamicInvoke(a.Append(ret).ToArray());
+
             return ret!;
         }
 
@@ -159,23 +173,25 @@ namespace Peon.Utility
 
     public class DynamicHook<T> : DynamicHookBase where T : Delegate
     {
+        public readonly Delegate? Condition;
         public readonly Delegate? PreAction;
         public readonly Delegate? PostAction;
         public readonly Hook<T>?  Hook;
 
-        public DynamicHook(string name, int offset, Delegate? pre = null, Delegate? post = null)
+        public DynamicHook(string name, int offset, Delegate? condition, Delegate? pre = null, Delegate? post = null)
             : base(name, offset)
         {
+            Condition  = condition;
             PreAction  = pre;
             PostAction = post;
             Hook       = GetHook<T>(offset);
         }
 
         protected override void FullDetour(params dynamic?[] a)
-            => FullDetourBase(Hook!.Original, PreAction, PostAction, a);
+            => FullDetourBase(Hook!.Original, Condition, PreAction, PostAction, a);
 
         protected override dynamic FullDetourRet(params dynamic?[] a)
-            => FullDetourRetBase(Hook!.Original, PreAction, PostAction, a);
+            => FullDetourRetBase(Hook!.Original, Condition, PreAction, PostAction, a);
 
         public override void Enable()
             => Hook?.Enable();
@@ -219,7 +235,8 @@ namespace Peon.Utility
         public void Disable(string name)
             => _hooks.FirstOrDefault(h => h.Name == name)?.Disable();
 
-        public DynamicHook<T>? Create<T>(string name, int offset, bool enabled, Delegate? pre = null, Delegate? post = null) where T : Delegate
+        public DynamicHook<T>? Create<T>(string name, int offset, bool enabled, Delegate? condition = null, Delegate? pre = null,
+            Delegate? post = null) where T : Delegate
         {
             var preExisting = _hooks.FirstOrDefault(h => h.Name == name);
             if (preExisting != null)
@@ -230,7 +247,7 @@ namespace Peon.Utility
 
             try
             {
-                var hook = new DynamicHook<T>(name, offset, pre, post);
+                var hook = new DynamicHook<T>(name, offset, condition, pre, post);
                 if (!_enabled || !enabled)
                     hook.Disable();
                 _hooks.Add(hook);

@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using Dalamud.Hooking;
 using Dalamud.Logging;
-using Dalamud.Plugin;
 using Peon.SeFunctions;
 using Peon.Utility;
 
@@ -16,6 +15,7 @@ namespace Peon.Managers
     {
         SelectYesNoSetup,
         SelectStringSetup,
+        JournalResultSetup,
 
         TalkUpdate,
 
@@ -33,20 +33,23 @@ namespace Peon.Managers
     {
         private readonly Hook<OnAddonSetupDelegate>?  _onSelectYesnoSetupHook;
         private readonly Hook<OnAddonSetupDelegate>?  _onSelectStringSetupHook;
+        private readonly Hook<OnAddonSetupDelegate>?  _onJournalResultSetupHook;
         private readonly Hook<OnAddonUpdateDelegate>? _onTalkUpdateHook;
         private readonly Hook<OnAddonChangeDelegate>? _onTextErrorChangeHook;
 
         public event OnAddonEventDelegate? OnSelectYesnoSetup;
         public event OnAddonEventDelegate? OnSelectStringSetup;
+        public event OnAddonEventDelegate? OnJournalResultSetup;
         public event OnAddonEventDelegate? OnTalkUpdate;
         public event OnAddonEventDelegate? OnTextErrorChange;
 
         public AddonWatcher()
         {
-            _onSelectYesnoSetupHook  = Service<YesNoOnSetup>.Get().CreateHook(OnSelectYesNoSetupDetour);
-            _onSelectStringSetupHook = Service<SelectStringOnSetup>.Get().CreateHook(OnSelectStringSetupDetour);
-            _onTalkUpdateHook        = Service<TalkOnUpdate>.Get().CreateHook(OnTalkUpdateDetour);
-            _onTextErrorChangeHook   = Service<TextErrorOnChange>.Get().CreateHook(OnTextErrorChangeDetour);
+            _onSelectYesnoSetupHook   = Service<YesNoOnSetup>.Get().CreateHook(OnSelectYesNoSetupDetour);
+            _onSelectStringSetupHook  = Service<SelectStringOnSetup>.Get().CreateHook(OnSelectStringSetupDetour);
+            _onJournalResultSetupHook = Service<JournalResultOnSetup>.Get().CreateHook(OnJournalResultSetupDetour);
+            _onTalkUpdateHook         = Service<TalkOnUpdate>.Get().CreateHook(OnTalkUpdateDetour);
+            _onTextErrorChangeHook    = Service<TextErrorOnChange>.Get().CreateHook(OnTextErrorChangeDetour);
         }
 
         public ref OnAddonEventDelegate? this[AddonEvent addonEvent]
@@ -55,11 +58,12 @@ namespace Peon.Managers
             {
                 switch (addonEvent)
                 {
-                    case AddonEvent.SelectYesNoSetup:  return ref OnSelectYesnoSetup;
-                    case AddonEvent.SelectStringSetup: return ref OnSelectStringSetup;
-                    case AddonEvent.TalkUpdate:        return ref OnTalkUpdate;
-                    case AddonEvent.TextErrorChange:   return ref OnTextErrorChange;
-                    default:                           throw new InvalidEnumArgumentException();
+                    case AddonEvent.SelectYesNoSetup:   return ref OnSelectYesnoSetup;
+                    case AddonEvent.SelectStringSetup:  return ref OnSelectStringSetup;
+                    case AddonEvent.JournalResultSetup: return ref OnJournalResultSetup;
+                    case AddonEvent.TalkUpdate:         return ref OnTalkUpdate;
+                    case AddonEvent.TextErrorChange:    return ref OnTextErrorChange;
+                    default:                            throw new InvalidEnumArgumentException();
                 }
             }
         }
@@ -113,6 +117,14 @@ namespace Peon.Managers
             OnSelectStringSetup?.Invoke(ptr, dataPtr);
         }
 
+        private void OnJournalResultSetupDetour(IntPtr ptr, int b, IntPtr dataPtr)
+        {
+            _onJournalResultSetupHook!.Original(ptr, b, dataPtr);
+            PluginLog.Verbose("[AddonWatcher] JournalResult addon setup at 0x{Address:X16} with data 0x{Data:X16}.", ptr.ToInt64(),
+                dataPtr.ToInt64());
+            OnJournalResultSetup?.Invoke(ptr, dataPtr);
+        }
+
         private void OnTalkUpdateDetour(IntPtr ptr, IntPtr dataPtr)
         {
             _onTalkUpdateHook!.Original(ptr, dataPtr);
@@ -132,6 +144,7 @@ namespace Peon.Managers
         {
             _onSelectYesnoSetupHook?.Dispose();
             _onSelectStringSetupHook?.Dispose();
+            _onJournalResultSetupHook?.Dispose();
             _onTalkUpdateHook?.Dispose();
             _onTextErrorChangeHook?.Dispose();
             base.Dispose();

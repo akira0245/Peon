@@ -13,61 +13,164 @@ namespace Peon.Managers
 {
     public class BotherHelper : IDisposable
     {
-        private readonly AddonWatcher           _addons;
+        private readonly AddonWatcher _addons;
 
         private readonly List<ChoiceBotherSet> _bothersYesNo;
 
-        private readonly List<TalkBotherSet>   _bothersTalk;
-        private readonly List<SelectBotherSet> _bothersSelect;
+        private readonly List<TalkBotherSet>        _bothersTalk;
+        private readonly List<SelectBotherSet>      _bothersSelect;
+        private readonly List<QuestBotherSet>       _bothersQuest;
+        private readonly List<AlternatingBotherSet> _bothersAlternatingSelect;
 
         internal bool  _skipNextTalk;
+        internal bool  _completeNextQuest;
         internal bool? _selectNextYesNo;
 
         public BotherSetter SkipNextTalk()
-            => new(true, _selectNextYesNo, this);
+            => new(true, _selectNextYesNo, _completeNextQuest, this);
 
         public BotherSetter SelectNextYesNo(bool which)
-            => new(_skipNextTalk, which, this);
+            => new(_skipNextTalk, which, _completeNextQuest, this);
+
+        public BotherSetter CompleteNextQuest()
+            => new(_skipNextTalk, _selectNextYesNo, true, this);
 
         public readonly struct BotherSetter : IDisposable
         {
             private readonly BotherHelper _bother;
             private readonly bool         _skipNextTalkOld;
+            private readonly bool         _completeNextQuestOld;
             private readonly bool?        _selectNextYesNoOld;
 
-            internal BotherSetter(bool skipNextTalk, bool? selectNextYesNo, BotherHelper bother)
+            internal BotherSetter(bool skipNextTalk, bool? selectNextYesNo, bool completeNextQuest, BotherHelper bother)
             {
-                _bother                  = bother;
-                _skipNextTalkOld         = bother._skipNextTalk;
-                _selectNextYesNoOld      = bother._selectNextYesNo;
-                _bother._skipNextTalk    = skipNextTalk;
-                _bother._selectNextYesNo = selectNextYesNo;
+                _bother                    = bother;
+                _skipNextTalkOld           = bother._skipNextTalk;
+                _selectNextYesNoOld        = bother._selectNextYesNo;
+                _completeNextQuestOld      = bother._completeNextQuest;
+                _bother._skipNextTalk      = skipNextTalk;
+                _bother._selectNextYesNo   = selectNextYesNo;
+                _bother._completeNextQuest = completeNextQuest;
             }
 
             public void Dispose()
             {
-                _bother._skipNextTalk    = _skipNextTalkOld;
-                _bother._selectNextYesNo = _selectNextYesNoOld;
+                _bother._skipNextTalk      = _skipNextTalkOld;
+                _bother._selectNextYesNo   = _selectNextYesNoOld;
+                _bother._completeNextQuest = _completeNextQuestOld;
             }
         }
 
         public BotherHelper(AddonWatcher addons)
         {
-            _addons          = addons;
-            _bothersYesNo    = Peon.Config.BothersYesNo;
-            _bothersTalk     = Peon.Config.BothersTalk;
-            _bothersSelect   = Peon.Config.BothersSelect;
+            _addons                   = addons;
+            _bothersYesNo             = Peon.Config.BothersYesNo;
+            _bothersTalk              = Peon.Config.BothersTalk;
+            _bothersSelect            = Peon.Config.BothersSelect;
+            _bothersAlternatingSelect = Peon.Config.BothersAlternatingSelect;
+            _bothersQuest             = Peon.Config.BothersQuest;
 
-            _addons.OnSelectStringSetup += OnSelectStringSetup;
-            _addons.OnSelectYesnoSetup  += OnYesNoSetup;
-            _addons.OnTalkUpdate        += OnTalkUpdate;
+            _addons.OnSelectStringSetup  += OnSelectStringSetup;
+            _addons.OnSelectYesnoSetup   += OnYesNoSetup;
+            _addons.OnJournalResultSetup += OnJournalResultSetup;
+            _addons.OnTalkUpdate         += OnTalkUpdate;
         }
 
         public void Dispose()
         {
-            _addons.OnSelectStringSetup -= OnSelectStringSetup;
-            _addons.OnSelectYesnoSetup  -= OnYesNoSetup;
-            _addons.OnTalkUpdate        -= OnTalkUpdate;
+            _addons.OnSelectStringSetup  -= OnSelectStringSetup;
+            _addons.OnSelectYesnoSetup   -= OnYesNoSetup;
+            _addons.OnJournalResultSetup -= OnJournalResultSetup;
+            _addons.OnTalkUpdate         -= OnTalkUpdate;
+        }
+
+        private void HandleSelectBother(SelectBotherSet bother, PtrSelectString selectStringPtr, string[]? texts, string mainText)
+        {
+            switch (bother.Source)
+            {
+                case SelectSource.SelectionText:
+                {
+                    texts ??= selectStringPtr.ItemTexts();
+                    var idx = Array.FindIndex(texts, bother.SelectionMatches);
+                    if (idx >= 0)
+                    {
+                        selectStringPtr.Select(idx);
+                        {
+                            PluginLog.Verbose(
+                                "Clicked SelectString window at {Index} due to match on {StringType}, {MatchType}: \"{Text}\".", idx,
+                                bother.Source, bother.SelectionMatchType, bother.SelectionText);
+                            return;
+                        }
+                    }
+
+                    break;
+                }
+                case SelectSource.CheckMainAndSelectionText:
+                {
+                    if (bother.MainMatches(mainText))
+                    {
+                        texts ??= selectStringPtr.ItemTexts();
+                        var idx = Array.FindIndex(texts, bother.SelectionMatches);
+                        if (selectStringPtr.Select(idx))
+                        {
+                            PluginLog.Verbose(
+                                "Clicked SelectString window at {Index} due to match on {StringType}, {MainMatchType}: \"{MainText}\" and {SelectionMatchType}: \"{SelectionText}\".",
+                                idx, bother.Source, bother.MainMatchType, bother.MainText, bother.SelectionMatchType, bother.SelectionText);
+                            return;
+                        }
+                    }
+
+                    break;
+                }
+                case SelectSource.CheckMainAndSelectionIndex:
+                {
+                    if (bother.MainMatches(mainText))
+                    {
+                        var count = selectStringPtr.Count;
+                        var idx   = bother.Index < 0 ? count + bother.Index : bother.Index;
+                        if (selectStringPtr.Select(idx))
+                        {
+                            PluginLog.Verbose(
+                                "Clicked SelectString window at {Index} due to match on {StringType}, {MainMatchType}: \"{MainText}\" and Index {ReqIndex}.",
+                                idx, bother.Source, bother.MainMatchType, bother.MainText, bother.Index);
+                            return;
+                        }
+                    }
+
+                    break;
+                }
+                case SelectSource.CheckIndexAndText:
+                {
+                    texts ??= selectStringPtr.ItemTexts();
+                    var idx = bother.Index < 0 ? texts.Length + bother.Index : bother.Index;
+                    if (idx > 0 && idx < texts.Length && bother.SelectionMatches(texts[idx]) && selectStringPtr.Select(idx))
+                    {
+                        PluginLog.Verbose(
+                            "Clicked SelectString window at {Index} due to match on {StringType}, {SelectionMatchType}: \"{SelectionText}\" and Index {ReqIndex}.",
+                            idx, bother.Source, bother.SelectionMatchType, bother.SelectionText, bother.Index);
+                        return;
+                    }
+
+                    break;
+                }
+                case SelectSource.CheckAll:
+                    if (bother.MainMatches(mainText))
+                    {
+                        texts ??= selectStringPtr.ItemTexts();
+                        var idx = bother.Index < 0 ? texts.Length + bother.Index : bother.Index;
+                        if (idx > 0 && idx < texts.Length && bother.SelectionMatches(texts[idx]) && selectStringPtr.Select(idx))
+                        {
+                            PluginLog.Verbose(
+                                "Clicked SelectString window at {Index} due to match on {StringType}, {MainMatchType}: \"{MainText}\", {SelectionMatchType}: \"{SelectionText}\" and Index {ReqIndex}.",
+                                idx, bother.Source, bother.MainMatchType, bother.MainText, bother.SelectionMatchType, bother.SelectionText,
+                                bother.Index);
+                            return;
+                        }
+                    }
+
+                    break;
+                default: throw new ArgumentOutOfRangeException();
+            }
         }
 
 
@@ -80,91 +183,15 @@ namespace Peon.Managers
             var             mainText        = selectStringPtr.Description();
             string[]?       texts           = null;
             foreach (var bother in _bothersSelect.Where(b => b.Source != SelectSource.Disabled))
-                switch (bother.Source)
-                {
-                    case SelectSource.SelectionText:
-                    {
-                        texts ??= selectStringPtr.ItemTexts();
-                        var idx = Array.FindIndex(texts, bother.SelectionMatches);
-                        if (idx >= 0)
-                        {
-                            selectStringPtr.Select(idx);
-                            {
-                                PluginLog.Verbose(
-                                    "Clicked SelectString window at {Index} due to match on {StringType}, {MatchType}: \"{Text}\".", idx,
-                                    bother.Source, bother.SelectionMatchType, bother.SelectionText);
-                                return;
-                            }
-                        }
+                HandleSelectBother(bother, selectStringPtr, texts, mainText);
 
-                        break;
-                    }
-                    case SelectSource.CheckMainAndSelectionText:
-                    {
-                        if (bother.MainMatches(mainText))
-                        {
-                            texts ??= selectStringPtr.ItemTexts();
-                            var idx = Array.FindIndex(texts, bother.SelectionMatches);
-                            if (selectStringPtr.Select(idx))
-                            {
-                                PluginLog.Verbose(
-                                    "Clicked SelectString window at {Index} due to match on {StringType}, {MainMatchType}: \"{MainText}\" and {SelectionMatchType}: \"{SelectionText}\".",
-                                    idx, bother.Source, bother.MainMatchType, bother.MainText, bother.SelectionMatchType, bother.SelectionText);
-                                return;
-                            }
-                        }
-
-                        break;
-                    }
-                    case SelectSource.CheckMainAndSelectionIndex:
-                    {
-                        if (bother.MainMatches(mainText))
-                        {
-                            var count = selectStringPtr.Count;
-                            var idx   = bother.Index < 0 ? count + bother.Index : bother.Index;
-                            if (selectStringPtr.Select(idx))
-                            {
-                                PluginLog.Verbose(
-                                    "Clicked SelectString window at {Index} due to match on {StringType}, {MainMatchType}: \"{MainText}\" and Index {ReqIndex}.",
-                                    idx, bother.Source, bother.MainMatchType, bother.MainText, bother.Index);
-                                return;
-                            }
-                        }
-
-                        break;
-                    }
-                    case SelectSource.CheckIndexAndText:
-                    {
-                        texts ??= selectStringPtr.ItemTexts();
-                        var idx = bother.Index < 0 ? texts.Length + bother.Index : bother.Index;
-                        if (idx > 0 && idx < texts.Length && bother.SelectionMatches(texts[idx]) && selectStringPtr.Select(idx))
-                        {
-                            PluginLog.Verbose(
-                                "Clicked SelectString window at {Index} due to match on {StringType}, {SelectionMatchType}: \"{SelectionText}\" and Index {ReqIndex}.",
-                                idx, bother.Source, bother.SelectionMatchType, bother.SelectionText, bother.Index);
-                            return;
-                        }
-
-                        break;
-                    }
-                    case SelectSource.CheckAll:
-                        if (bother.MainMatches(mainText))
-                        {
-                            texts ??= selectStringPtr.ItemTexts();
-                            var idx = bother.Index < 0 ? texts.Length + bother.Index : bother.Index;
-                            if (idx > 0 && idx < texts.Length && bother.SelectionMatches(texts[idx]) && selectStringPtr.Select(idx))
-                            {
-                                PluginLog.Verbose(
-                                    "Clicked SelectString window at {Index} due to match on {StringType}, {MainMatchType}: \"{MainText}\", {SelectionMatchType}: \"{SelectionText}\" and Index {ReqIndex}.",
-                                    idx, bother.Source, bother.MainMatchType, bother.MainText, bother.SelectionMatchType, bother.SelectionText,
-                                    bother.Index);
-                                return;
-                            }
-                        }
-
-                        break;
-                    default: throw new ArgumentOutOfRangeException();
-                }
+            foreach (var bother in _bothersAlternatingSelect.Where(b
+                => (b.Bothers.FirstOrDefault()?.Source ?? SelectSource.Disabled) != SelectSource.Disabled))
+            {
+                var idx = bother.CurrentSet % bother.Bothers.Length;
+                HandleSelectBother(bother.Bothers[idx], selectStringPtr, texts, mainText);
+                bother.CurrentSet = idx == bother.Bothers.Length - 1 ? 0 : idx + 1;
+            }
         }
 
         private void OnTalkUpdate(IntPtr ptr, IntPtr _)
@@ -244,6 +271,25 @@ namespace Peon.Managers
                     "Clicked \"{ButtonText}\" in Yesno window due to match on {StringType}, {MatchType}: \"{Text}\".",
                     click.Value ? yesText : noText, set.Source, set.MatchType, set.Text);
             }
+        }
+
+        private void OnJournalResultSetup(IntPtr ptr, IntPtr _)
+        {
+            if (!_completeNextQuest && !Peon.Config.EnableNoBother)
+                return;
+
+            PtrJournalResult journalPtr = ptr;
+            var              name       = journalPtr.QuestName();
+
+            foreach (var set in _bothersQuest.Where(b => b.Enabled))
+                if (_completeNextQuest || set.Matches(name))
+                {
+                    journalPtr.Complete();
+                    PluginLog.Verbose("Completed Quest \"{QuestName}\" due to match on {MatchType}: \"{Text}\".", name,
+                        set.MatchType, set.Text);
+
+                    break;
+                }
         }
     }
 }

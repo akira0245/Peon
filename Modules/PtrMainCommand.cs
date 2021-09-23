@@ -13,10 +13,15 @@ namespace Peon.Modules
         public static implicit operator bool(PtrMainCommand ptr)
             => ptr.Pointer != null;
 
+        private const ulong SystemFlags = 1840019; // Unknown, but consistent
+
         public void System()
         {
             var button = Pointer->UldManager.NodeList[8];
-            Module.ClickAddon(Pointer, button, EventType.Change, 7);
+
+            using var helper = new Module.ClickHelper(Pointer, button);
+            helper.Data[3] = (byte*) 7;
+            Module.ClickAddonHelper(Pointer, button, EventType.Change, 7, helper.Data);
         }
     }
 }
