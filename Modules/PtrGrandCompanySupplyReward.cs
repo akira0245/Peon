@@ -14,10 +14,10 @@ namespace Peon.Modules
             => ptr.Pointer != null;
 
         private AtkComponentNode* CancelButton
-            => (AtkComponentNode*) Pointer->RootNode->ChildNode->PrevSiblingNode->PrevSiblingNode->ChildNode;
+            => (AtkComponentNode*) Pointer->UldManager.NodeList[4];
 
         private AtkComponentNode* DeliverButton
-            => (AtkComponentNode*) ((AtkResNode*) CancelButton)->PrevSiblingNode;
+            => (AtkComponentNode*)Pointer->UldManager.NodeList[5];
 
         public void Deliver()
             => Module.ClickAddon(Pointer, DeliverButton, EventType.Change, 0);

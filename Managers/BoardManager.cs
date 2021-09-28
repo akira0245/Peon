@@ -5,19 +5,21 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Logging;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 using Peon.Modules;
 
 namespace Peon.Managers
 {
     public class BoardManager : WorkManager
     {
-        private PtrHousingSignBoard _board;
-        private PtrSelectString     _select;
-        private bool                _buyCompany;
-        private bool                _killOnFailure;
-        private bool                _keepRetrying;
-        private int                 _minDelayMs;
-        private int                 _maxDelayMs;
+        private new const int                 DefaultTimeOut = 1000;
+        private           PtrHousingSignBoard _board;
+        private           PtrSelectString     _select;
+        private           bool                _buyCompany;
+        private           bool                _killOnFailure;
+        private           bool                _keepRetrying;
+        private           int                 _minDelayMs;
+        private           int                 _maxDelayMs;
 
         public BoardManager(TargetManager target, AddonWatcher addons, BotherHelper bothers, InterfaceManager iManager)
             : base(target, addons, bothers, iManager)
@@ -26,7 +28,7 @@ namespace Peon.Managers
         protected override WorkState SetInitialState()
         {
             _board = Interface.HousingSignBoard();
-            if (_board)
+            if (_board )
                 return WorkState.BoardPlacardOpen;
 
             _select = Interface.SelectString();
@@ -58,7 +60,10 @@ namespace Peon.Managers
         private bool FailureOrRetry(string text)
         {
             if (_keepRetrying)
+            {
+                Targets.Target("Placard");
                 return Retry();
+            }
 
             return Failure(text);
         }
@@ -67,11 +72,11 @@ namespace Peon.Managers
         {
             return State switch
             {
-                WorkState.None        => ContactPlacard(),
+                WorkState.None             => ContactPlacard(),
                 WorkState.BoardPlacardOpen => Purchase(),
                 WorkState.BoardBuyerSelect => SelectBuyer(),
                 WorkState.BoardWait        => Wait(),
-                _                     => throw new InvalidEnumArgumentException(),
+                _                          => throw new InvalidEnumArgumentException(),
             };
         }
 
@@ -81,7 +86,7 @@ namespace Peon.Managers
                 return _killOnFailure ? Kill() : Failure("House not purchasable.");
 
             var task = Interface.Add("SelectString", true, DefaultTimeOut,
-                ptr => ((PtrSelectString)ptr).Description() == "Select a buyer.");
+                ptr => ((PtrSelectString) ptr).Description() == "Select a buyer." && ((PtrSelectString)ptr).Count >= 2);
             _board.Click(true);
             Wait(task, DefaultTimeOut);
             if (!task.IsCompleted || task.Result == IntPtr.Zero)
@@ -95,9 +100,13 @@ namespace Peon.Managers
 
         private bool SelectBuyer()
         {
-            var       task   = Interface.AddInverted("HousingSignBoard", false, DefaultTimeOut);
+            if (_select.Count > 2)
+                return _killOnFailure ? Kill() : Failure("Already own a plot.");
+
             using var bother = Bothers.SelectNextYesNo(true);
             _select.Select(_buyCompany ? 1 : 0);
+
+            var       task   = Interface.AddInverted("HousingSignBoard", false, DefaultTimeOut);
             Wait(task, DefaultTimeOut);
             if (!task.IsCompleted || task.Result != IntPtr.Zero)
                 return FailureOrRetry("Could not select buyer.");
@@ -105,25 +114,27 @@ namespace Peon.Managers
             _board  = IntPtr.Zero;
             _select = IntPtr.Zero;
             State   = WorkState.BoardWait;
-            var targetTask = Targets.Target("Placard");
+            Targets.Target("Placard");
             return true;
         }
 
         private bool Wait()
         {
+            Targets.Target("Placard");
             var milliseconds = RandomNumberGenerator.GetInt32(_minDelayMs, _maxDelayMs);
             PluginLog.Debug("Waiting for {Time} milliseconds.", milliseconds);
-            var task       = Task.Delay(milliseconds, CancelToken?.Token ?? new CancellationToken());
+            var task = Task.Delay(milliseconds, CancelToken?.Token ?? new CancellationToken());
             Wait(task);
             if (!task.IsCompleted)
                 return FailureOrRetry("Could not wait.");
+
             State = WorkState.None;
             return true;
         }
 
-        private bool ContactPlacard()
+        private unsafe bool ContactPlacard()
         {
-            var task = Interface.Add("HousingSignBoard", true, DefaultTimeOut);
+            var task = Interface.Add("HousingSignBoard", true, DefaultTimeOut * 3, ptr => ((PtrHousingSignBoard) ptr).IsReady());
             if (task.IsCompleted)
             {
                 _board = task.Result;
@@ -131,21 +142,17 @@ namespace Peon.Managers
                 return true;
             }
 
-            var targetTask = Targets.Interact("Placard", DefaultTimeOut / 6);
-
-            Wait(targetTask, DefaultTimeOut / 3);
-            switch (targetTask.IsCompleted ? targetTask.Result : TargetingState.TimeOut)
+            var targetTask = Targets.InteractWithoutKey("Placard");
+            switch (targetTask)
             {
-                case TargetingState.ActorNotFound:   return Failure("No placard in the vicinity.");
-                case TargetingState.ActorNotInRange: return Failure("Too far away from placard.");
-                case TargetingState.TimeOut:
+                case TargetingState.ActorNotFound: return Failure("No placard in the vicinity.");
                 case TargetingState.Unknown:
-                    return FailureOrRetry("Unknown error.");
+                case TargetingState.TimeOut:       return FailureOrRetry("Could not open Placard.");
             }
 
             Wait(task, DefaultTimeOut);
             if (!task.IsCompleted || task.Result == IntPtr.Zero)
-                return FailureOrRetry("Could not open Placard.");
+                return FailureOrRetry("Unknown error.");
 
             State  = WorkState.BoardPlacardOpen;
             _board = task.Result;

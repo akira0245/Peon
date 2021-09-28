@@ -14,7 +14,7 @@ namespace Peon.Modules
             => ptr.Pointer != null;
 
         private AtkComponentNode* ListNode
-            => (AtkComponentNode*) Pointer->RootNode->ChildNode->PrevSiblingNode->PrevSiblingNode;
+            => (AtkComponentNode*) Pointer->UldManager.NodeList[5];
 
         public int Count
             => ((AtkComponentList*) ListNode->Component)->ListLength;

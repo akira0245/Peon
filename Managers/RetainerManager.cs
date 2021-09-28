@@ -341,10 +341,14 @@ namespace Peon.Managers
         {
             var task = Interface.Add("RetainerList", true, DefaultTimeOut);
 
-            var targetTask = Targets.Interact(StringId.SummoningBell.Value(), DefaultTimeOut / 6);
-            Wait(targetTask);
-            if (!targetTask.IsCompleted || targetTask.Result != TargetingState.Success)
-                return Failure($"Targeting failed {targetTask.Result}.");
+            var targetTask = Targets.InteractWithoutKey(StringId.SummoningBell.Value());
+            switch (targetTask)
+            {
+                case TargetingState.ActorNotFound:
+                case TargetingState.Unknown:
+                case TargetingState.TimeOut:
+                    return Failure($"Targeting failed {targetTask}.");
+            }
 
             Wait(task);
             if (!task.IsCompleted || task.Result == IntPtr.Zero)

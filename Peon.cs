@@ -82,7 +82,7 @@ namespace Peon
             InterfaceManager = new InterfaceManager();
             Addons           = new AddonWatcher();
             InputManager     = new InputManager();
-            Targeting        = new TargetManager(InputManager, Addons);
+            Targeting        = new TargetManager(InputManager, Addons, InterfaceManager);
             OhBother         = new BotherHelper(Addons);
             Retainers        = new RetainerManager(Targeting, Addons!, OhBother, InterfaceManager!);
             Login            = new LoginManager(OhBother, InterfaceManager!);
@@ -186,12 +186,19 @@ namespace Peon
             {
                 case "test":
                 {
+                    var target = Dalamud.Objects.FirstOrDefault(o => o.Name.TextValue == "Voyage Control Panel");
+                    if (target == null)
+                        return;
+
+                    var oldFocusTarget = Dalamud.Targets.FocusTarget;
+                    Dalamud.Targets.SetFocusTarget(target);
                     var focus = InterfaceManager.FocusTarget();
                     if (!focus)
                         return;
 
                     Dalamud.Chat.Print(focus.TargetName());
                     focus.Interact();
+                    Dalamud.Targets.SetFocusTarget(oldFocusTarget);
                     break;
                 }
                 case "sig":
@@ -518,7 +525,7 @@ namespace Peon
                                 return;
 
                             PtrGrandCompanySupplyList s = ptr;
-                            while (s.Count > 0)
+                            while (s && s.Count > 0)
                             {
                                 s.Select(0);
                                 var task = InterfaceManager.Add("GrandCompanySupplyReward", false, 3000);
@@ -542,10 +549,10 @@ namespace Peon
                     Chocobos.FeedAllChocobos();
                     break;
                 case "buyplot":
-                    Board.StartBuying(50, 250, true, false, true);
+                    Board.StartBuying(100, 150, true, false, true);
                     break;
                 case "buyplotkill":
-                    Board.StartBuying(150, 250, true, true);
+                    Board.StartBuying(100, 150, true, true);
                     break;
             }
         }

@@ -84,6 +84,12 @@ namespace Peon.Modules
                 Data[1] = (byte*) fromValue;
             }
 
+            public EventData(bool rightClick)
+            {
+                Data    = (byte**)Marshal.AllocHGlobal(0x18).ToPointer();
+                Data[0] = (byte*)0x0001000000000000;
+            }
+
             public void Dispose()
             {
                 var ptr = new IntPtr(Data);
@@ -137,8 +143,10 @@ namespace Peon.Modules
             if (idx < 0 || idx >= list->ListLength)
                 return false;
 
-            using var data = new EventData(list->ItemRendererList[idx].AtkComponentListItemRenderer, (ushort) idx);
-            ClickAddon(addon, node, EventType.ListIndexChange, value, data.Data);
+            using var data   = new EventData(list->ItemRendererList[idx].AtkComponentListItemRenderer, (ushort) idx);
+            using var helper = new ClickHelper(addon, node);
+            helper.Data[5] = (byte*)0x40023;
+            ClickAddon(addon, node, EventType.ListIndexChange, value, data.Data, helper.Data);
             return true;
         }
 
@@ -151,8 +159,11 @@ namespace Peon.Modules
                 if (!callback(renderer))
                     continue;
 
-                using var data = new EventData(renderer, (ushort) i);
-                ClickAddon(addon, node, EventType.ListIndexChange, value, data.Data);
+                using var data   = new EventData(renderer, (ushort) i);
+                using var helper = new ClickHelper(addon, node);
+                helper.Data[5] = (byte*) 0x40023;
+
+                ClickAddon(addon, node, EventType.ListIndexChange, value, data.Data, helper.Data);
                 return true;
             }
 

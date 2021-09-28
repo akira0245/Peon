@@ -22,35 +22,43 @@ namespace Peon.Managers
         private readonly List<QuestBotherSet>       _bothersQuest;
         private readonly List<AlternatingBotherSet> _bothersAlternatingSelect;
 
-        internal bool  _skipNextTalk;
-        internal bool  _completeNextQuest;
-        internal bool? _selectNextYesNo;
+        internal bool                        _skipNextTalk;
+        internal bool                        _completeNextQuest;
+        internal bool?                       _selectNextYesNo;
+        internal Func<PtrSelectString, int>? _selectNextString;
 
         public BotherSetter SkipNextTalk()
-            => new(true, _selectNextYesNo, _completeNextQuest, this);
+            => new(true, _selectNextYesNo, _completeNextQuest, _selectNextString, this);
 
         public BotherSetter SelectNextYesNo(bool which)
-            => new(_skipNextTalk, which, _completeNextQuest, this);
+            => new(_skipNextTalk, which, _completeNextQuest, _selectNextString, this);
 
         public BotherSetter CompleteNextQuest()
-            => new(_skipNextTalk, _selectNextYesNo, true, this);
+            => new(_skipNextTalk, _selectNextYesNo, true, _selectNextString, this);
+
+        public BotherSetter SelectNextString(Func<PtrSelectString, int> func)
+            => new(_skipNextTalk, _selectNextYesNo, _completeNextQuest, func, this);
 
         public readonly struct BotherSetter : IDisposable
         {
-            private readonly BotherHelper _bother;
-            private readonly bool         _skipNextTalkOld;
-            private readonly bool         _completeNextQuestOld;
-            private readonly bool?        _selectNextYesNoOld;
+            private readonly BotherHelper                _bother;
+            private readonly bool                        _skipNextTalkOld;
+            private readonly bool                        _completeNextQuestOld;
+            private readonly bool?                       _selectNextYesNoOld;
+            private readonly Func<PtrSelectString, int>? _selectNextStringOld;
 
-            internal BotherSetter(bool skipNextTalk, bool? selectNextYesNo, bool completeNextQuest, BotherHelper bother)
+            internal BotherSetter(bool skipNextTalk, bool? selectNextYesNo, bool completeNextQuest, Func<PtrSelectString, int>? selectNextString,
+                BotherHelper bother)
             {
                 _bother                    = bother;
                 _skipNextTalkOld           = bother._skipNextTalk;
                 _selectNextYesNoOld        = bother._selectNextYesNo;
                 _completeNextQuestOld      = bother._completeNextQuest;
+                _selectNextStringOld       = bother._selectNextString;
                 _bother._skipNextTalk      = skipNextTalk;
                 _bother._selectNextYesNo   = selectNextYesNo;
                 _bother._completeNextQuest = completeNextQuest;
+                _bother._selectNextString  = selectNextString;
             }
 
             public void Dispose()
@@ -58,6 +66,7 @@ namespace Peon.Managers
                 _bother._skipNextTalk      = _skipNextTalkOld;
                 _bother._selectNextYesNo   = _selectNextYesNoOld;
                 _bother._completeNextQuest = _completeNextQuestOld;
+                _bother._selectNextString  = _selectNextStringOld;
             }
         }
 
@@ -176,10 +185,19 @@ namespace Peon.Managers
 
         private void OnSelectStringSetup(IntPtr ptr, IntPtr _)
         {
-            if (!Peon.Config.EnableNoBother)
+            if (_selectNextString == null && !Peon.Config.EnableNoBother)
                 return;
 
             PtrSelectString selectStringPtr = ptr;
+            var             selectIdx             = _selectNextString?.Invoke(selectStringPtr) ?? -1;
+            _selectNextString = null;
+            if (selectIdx >= 0)
+            {
+                PluginLog.Verbose("Selected next string {Selection}.", selectStringPtr.ItemText(selectIdx));
+                selectStringPtr.Select(selectIdx);
+                return;
+            }
+
             var             mainText        = selectStringPtr.Description();
             string[]?       texts           = null;
             foreach (var bother in _bothersSelect.Where(b => b.Source != SelectSource.Disabled))
@@ -238,6 +256,7 @@ namespace Peon.Managers
 
             if (_selectNextYesNo != null)
             {
+                PluginLog.Verbose("Next YesNo clicked with {Value}", _selectNextYesNo.Value);
                 selectPtr.Click(_selectNextYesNo.Value);
                 return;
             }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection.Metadata.Ecma335;
 using System.Runtime.InteropServices;
 using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.System.Resource.Handle;
@@ -26,7 +27,8 @@ namespace Peon
             hooks.Create<DelegateReceiveEvent>("ReceiveHousingBoardEvent",  0x1058B40, false, null, ReceiveEventData);
             hooks.Create<DelegateReceiveEvent>("ReceiveRequestEvent",       0xd0a210,  false, null, ReceiveEventData);
             hooks.Create<DelegateReceiveEvent>("ReceiveJournalResultEvent", 0xDF9000,  false, null, ReceiveEventData);
-            hooks.Create<DelegateReceiveEvent>("ReceiveFocusTargetEvent",   0x101e6b0,  false, null, ReceiveEventData);
+            hooks.Create<DelegateReceiveEvent>("ReceiveFocusTargetEvent",   0x101e6b0,  false, (Func<IntPtr, ushort, int, IntPtr, IntPtr, bool>) EventDataCondition, ReceiveEventData);
+            hooks.Create<DelegateReceiveEvent>("ReceiveSelectStringEvent",   0xCDC310,  false, null, ReceiveEventData);
         }
 
         private static unsafe bool IncRefCondition(IntPtr a1, IntPtr a2, uint a3)
@@ -45,12 +47,15 @@ namespace Peon
             return true;
         }
 
+        private static bool EventDataCondition(IntPtr ptr, ushort eventType, int which, IntPtr source, IntPtr value)
+            => eventType == 3;
+
         private static DelegateReceiveEvent ReceiveEventData = (_, _, _, data, eventInfo) =>
         {
             PluginLog.Information(
-                $"Helper: [0] = {*(ulong*) (data + 0)}, [1] = {*(IntPtr*) (data + 8):X}, [2] = {*(IntPtr*) (data + 0x10):X}, [3] = {*(ulong*) (data + 0x18)}, [4] = {*(ulong*) (data + 0x20)}, [5] = {*(ulong*) (data + 0x28):X}, [6] = {*(IntPtr*) (data + 0x30):X}, [7] = {*(IntPtr*) (data + 0x38):X}");
+                $"Helper: [0] = {*(ulong*) (data + 0):X}, [1] = {*(IntPtr*) (data + 8):X}, [2] = {*(IntPtr*) (data + 0x10):X}, [3] = {*(ulong*) (data + 0x18):X}, [4] = {*(ulong*) (data + 0x20):X}, [5] = {*(ulong*) (data + 0x28):X}, [6] = {*(IntPtr*) (data + 0x30):X}, [7] = {*(IntPtr*) (data + 0x38):X}");
             PluginLog.Information(
-                $"Helper: [0] = {*(ulong*)(eventInfo + 0)}, [1] = {*(IntPtr*)(eventInfo + 8):X}, [2] = {*(IntPtr*)(eventInfo + 0x10):X}, [3] = {*(ulong*)(eventInfo + 0x18)}, [4] = {*(ulong*)(eventInfo + 0x20)}, [5] = {*(ulong*)(eventInfo + 0x28):X}, [6] = {*(IntPtr*)(eventInfo + 0x30):X}, [7] = {*(IntPtr*)(eventInfo + 0x38):X}");
+                $"Helper: [0] = {*(ulong*)(eventInfo + 0):X}, [1] = {*(IntPtr*)(eventInfo + 8):X}, [2] = {*(IntPtr*)(eventInfo + 0x10):X}");
         };
     }
 }

@@ -1,10 +1,14 @@
-﻿using System;
-using System.Linq;
-using System.Numerics;
-using Dalamud.Interface;
+﻿using Dalamud.Interface;
 using ImGuiNET;
 using Peon.Bothers;
 using Peon.Crafting;
+using Peon.Managers;
+using Peon.Utility;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using System.Reflection;
 
 namespace Peon.Gui
 {
@@ -526,28 +530,40 @@ namespace Peon.Gui
             if (!imgui.Begin(() => ImGui.BeginTabItem("Debug"), ImGui.EndTabItem))
                 return;
 
-            foreach (var job in _peon.Retainers.Identifier.Tasks)
+            if (ImGui.CollapsingHeader("Interface Waitlist"))
             {
-                if (!ImGui.BeginTable($"##{job.Key}", 5, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg))
-                    continue;
 
-
-                foreach (var task in job.Value)
+                if ((_peon.InterfaceManager.GetType().BaseType?
+                   .GetField("_waitList", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy)?
+                   .GetValue(_peon.InterfaceManager) is LinkedList<TimeOutList<IntPtr, ModuleInfo>.WaitBlock> waitList))
                 {
-                    ImGui.TableNextColumn();
-                    ImGui.Text(job.Key.ToString());
-                    ImGui.TableNextColumn();
-                    ImGui.Text(task.Key);
-                    ImGui.TableNextColumn();
-                    ImGui.Text(task.Value.Category.ToString());
-                    ImGui.TableNextColumn();
-                    ImGui.Text(task.Value.LevelRange.ToString());
-                    ImGui.TableNextColumn();
-                    ImGui.Text($"{task.Value.Item,2}");
-                    ImGui.TableNextRow();
+                    var i = 0;
+                    foreach (var waitBlock in waitList)
+                    {
+                        ImGui.Selectable(waitBlock.Infos.Inverted ? $"!{waitBlock.Infos.Name}##{i}" : $"{waitBlock.Infos.Name}##{i}");
+                        ImGui.SameLine();
+                        ImGui.Selectable($"{waitBlock.TimeOut}##{i++}");
+                    }
                 }
+                else
+                {
+                    ImGui.Text("Could not get Interface Waitlist");
+                }
+            }
 
-                ImGui.EndTable();
+            if (ImGui.CollapsingHeader("Temp Bothers"))
+            {
+                if (_peon.OhBother._skipNextTalk)
+                    ImGui.Text("Skip next Talk");
+
+                if (_peon.OhBother._selectNextYesNo.HasValue)
+                    ImGui.Text($"Select next {(_peon.OhBother._selectNextYesNo.Value ? "Yes" : "No")}");
+
+                if (_peon.OhBother._completeNextQuest)
+                    ImGui.Text("Complete next Quest");
+
+                if (_peon.OhBother._selectNextString != null)
+                    ImGui.Text("Trying to select next string.");
             }
         }
 

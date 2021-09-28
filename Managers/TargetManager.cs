@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Logging;
 using Dalamud.Plugin;
+using Lumina.Excel.GeneratedSheets;
 using Peon.Modules;
 using Peon.Utility;
 
@@ -22,40 +24,54 @@ namespace Peon.Managers
     {
         private readonly InputManager                          _inputManager;
         private readonly AddonWatcher                          _addons;
+        private readonly InterfaceManager                      _interface;
         private          TaskCompletionSource<TargetingState>? _state;
 
-        public TargetManager(InputManager inputManager, AddonWatcher addons)
+        public TargetManager(InputManager inputManager, AddonWatcher addons, InterfaceManager iface)
         {
-            _inputManager    = inputManager;
-            _addons          = addons;
+            _inputManager = inputManager;
+            _addons       = addons;
+            _interface    = iface;
+
         }
 
-        private static float Distance(GameObject? o1)
-            => o1 == null ? float.MaxValue : o1.YalmDistanceX * o1.YalmDistanceX + o1.YalmDistanceZ * o1.YalmDistanceZ;
+        private static float Distance(GameObject? o1, GameObject? o2)
+            => o1 == null || o2 == null ? float.MaxValue : Vector3.Distance(o1.Position, o2.Position);
 
-        public TargetingState Target(Predicate<GameObject> predicate)
+        public TargetingState GetTargetObject(Predicate<GameObject> predicate, out GameObject? actor)
         {
-            var         currentDistance = Distance(null);
-            GameObject? currentActor = null;
-            foreach (var actor in Dalamud.Objects)
+            actor = null;
+            var player          = Dalamud.ClientState.LocalPlayer;
+            if (player == null)
+                return TargetingState.ActorNotFound;
+
+            var currentDistance = Distance(player, null);
+            actor = null;
+            foreach (var obj in Dalamud.Objects)
             {
-                if (!predicate(actor))
+                if (!predicate(obj))
                     continue;
 
-                var dist = Distance(actor);
+                var dist = Distance(player, obj);
                 if (dist < currentDistance)
                 {
                     currentDistance = dist;
-                    currentActor    = actor;
+                    actor           = obj;
                 }
             }
+            return currentDistance == float.MaxValue ? TargetingState.ActorNotFound : TargetingState.Success;
+        }
 
-            if (currentDistance == float.MaxValue)
-                return TargetingState.ActorNotFound;
+        public TargetingState Target(Predicate<GameObject> predicate)
+        {
+            var ret = GetTargetObject(predicate, out var currentActor);
+            if (ret == TargetingState.Success)
+            {
+                PluginLog.Verbose("Target set to actor {ActorId}: {ActorName}.", currentActor!.ObjectId, currentActor.Name);
+                Dalamud.Targets.SetTarget(currentActor);
+            }
 
-            PluginLog.Verbose("Target set to actor {ActorId}: \"{ActorName}\".", currentActor!.ObjectId, currentActor!.Name);
-            Dalamud.Targets.SetTarget(currentActor!);
-            return TargetingState.Success;
+            return ret;
         }
 
         public TargetingState Target(string targetName)
@@ -65,6 +81,7 @@ namespace Peon.Managers
         {
             PtrTextError ptr  = modulePtr;
             var          text = ptr.Text();
+            PluginLog.Verbose("Error Text: {ErrorText}", text);
             if (StringId.TargetTooFarAway.Equal(text)
              || StringId.CannotSeeTarget.Equal(text)
              || StringId.TargetTooFarBelow.Equal(text)
@@ -115,5 +132,21 @@ namespace Peon.Managers
 
         public Task<TargetingState> Interact(string targetName, int timeOut)
             => Interact(timeOut, actor => actor.Name.ToString() == targetName);
+
+        public TargetingState InteractWithoutKey(string targetName)
+        {
+            var focus = _interface.FocusTarget();
+            if (!focus)
+                return TargetingState.Unknown;
+            if (GetTargetObject(actor => actor.Name.ToString() == targetName, out var target) != TargetingState.Success)
+                return TargetingState.ActorNotFound;
+
+            var oldFocus = Dalamud.Targets.FocusTarget;
+            PluginLog.Verbose("Interacting with {TargetName} ({Address}).", targetName, target!.Address);
+            Dalamud.Targets.SetFocusTarget(target);
+            focus.Interact();
+            Dalamud.Targets.SetFocusTarget(oldFocus);
+            return TargetingState.Success;
+        }
     }
 }

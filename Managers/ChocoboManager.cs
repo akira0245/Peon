@@ -68,15 +68,12 @@ namespace Peon.Managers
                 return true;
             }
 
-            var targetTask = Targets.Interact(StringId.ChocoboStable.Value(), DefaultTimeOut / 6);
-
-            Wait(targetTask);
-            switch (targetTask.IsCompleted ? targetTask.Result : TargetingState.TimeOut)
+            var targetTask = Targets.InteractWithoutKey(StringId.ChocoboStable.Value());
+            switch (targetTask)
             {
-                case TargetingState.ActorNotFound:   return Failure("No chocobo stable in the vicinity.");
-                case TargetingState.ActorNotInRange: return Failure("Too far away from chocobo stable.");
-                case TargetingState.TimeOut:
+                case TargetingState.ActorNotFound: return Failure("No chocobo stable in the vicinity.");
                 case TargetingState.Unknown:
+                case TargetingState.TimeOut:
                     return Failure("Unknown error.");
             }
 

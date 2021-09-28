@@ -119,7 +119,7 @@ namespace Peon.Managers
             => task.SetResult(IntPtr.Zero);
 
         protected override string ToString(ModuleInfo info)
-            => info.Name;
+            => info.Inverted ? $"!{info.Name}" : info.Name;
 
         protected override string ToString(IntPtr ret)
             => ret.ToInt64().ToString("X16");

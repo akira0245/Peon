@@ -25,6 +25,18 @@ namespace Peon.Modules
         public bool IsPurchasable()
             => Pointer->UldManager.NodeList[3]->IsVisible;
 
+        public string PriceString
+            => Module.TextNodeToString((AtkTextNode*) Pointer->UldManager.NodeList[18]);
+
+        public long Price
+            => long.Parse(PriceString.Replace(",", "").Replace(" Gil", ""));
+
+        public bool IsReady()
+        {
+            var node   = ((AtkTextNode*) Pointer->UldManager.NodeList[18]);
+            return node->NodeText.IsEmpty == 0;
+        }
+
         public void Click(bool yesNo)
         {
             var button = Pointer->UldManager.NodeList[8];

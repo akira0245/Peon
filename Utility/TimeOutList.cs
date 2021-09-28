@@ -8,7 +8,7 @@ namespace Peon.Utility
 {
     public class TimeOutList<TRet, TInfo> : IDisposable
     {
-        private readonly struct WaitBlock
+        internal readonly struct WaitBlock
         {
             public readonly TInfo                      Infos;
             public readonly ulong                      TimeOut;

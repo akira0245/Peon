@@ -22,7 +22,8 @@ namespace Peon.Modules
             using var helper = new Module.ClickHelper(Pointer, target);
             helper.Data[5] = (byte*) 0x184003;
             helper.Data[7] = (byte*) target;
-            Module.ClickAddonHelper(Pointer, target, (EventType) 3, 0, helper.Data);
+            using var eventData = new Module.EventData(true);
+            Module.ClickAddon(Pointer, target, (EventType) 3, 0, eventData.Data, helper.Data);
         }
     }
 }
