@@ -1,10 +1,12 @@
 ﻿{
-    "Author": "Ottermandias",
-    "Name": "Peon",
-    "Description": "Adds commands to automate some busywork and general quality of life.",
-    "InternalName": "Peon",
-    "AssemblyVersion": "1.0.0.0",
-    "RepoUrl": "",
-    "ApplicableVersion": "any",
-    "DalamudApiLevel": 4
+  "Author": "Ottermandias",
+  "Name": "Peon",
+  "Description": "Adds commands to automate some busywork and general quality of life.",
+  "InternalName": "Peon",
+  "AssemblyVersion": "1.0.0.0",
+  "RepoUrl": "",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 4,
+  "LoadPriority": 69421
 }
+ 

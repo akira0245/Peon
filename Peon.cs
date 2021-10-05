@@ -6,6 +6,8 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Dalamud.Game.Command;
 using Dalamud.Plugin;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using Lumina.Excel;
 using Lumina.Excel.GeneratedSheets;
 using Peon.Bothers;
@@ -27,7 +29,7 @@ namespace Peon
             => "Peon";
 
         public static PeonConfiguration Config = null!;
-
+        public static PeonTimers        Timers = null!;
 
         public readonly Interface        Interface;
         public readonly InterfaceManager InterfaceManager;
@@ -46,6 +48,8 @@ namespace Peon
         public readonly DebuggerCheck   DebuggerCheck;
         public readonly HookManager     Hooks = new();
         public readonly BoardManager    Board;
+        public readonly TimerManager    TimerManager;
+        public readonly TimerWindow     TimerWindow;
 
         public static long BaseAddress;
 
@@ -76,6 +80,7 @@ namespace Peon
             Localization = new Localization();
             LazyString.SetLocalization(Localization);
             Config = PeonConfiguration.Load();
+            Timers = PeonTimers.Load();
 
             Interface = new Interface(this);
             SetupServices();
@@ -92,6 +97,8 @@ namespace Peon
             BaseAddress      = Dalamud.SigScanner.Module.BaseAddress.ToInt64();
             LoginBar         = new LoginBar(Login, InterfaceManager);
             Board            = new BoardManager(Targeting, Addons, OhBother, InterfaceManager);
+            TimerManager     = new TimerManager(InterfaceManager);
+            TimerWindow      = new TimerWindow(TimerManager);
 
             _itemSheet = Dalamud.GameData.GetExcelSheet<Item>()!;
             _items     = new Dictionary<string, (Item, byte)>((int) _itemSheet.RowCount);
@@ -158,6 +165,7 @@ namespace Peon
 
         public void Dispose()
         {
+            TimerWindow.Dispose();
             Hooks.Dispose();
             LoginBar?.Dispose();
             OhBother?.Dispose();
@@ -186,19 +194,10 @@ namespace Peon
             {
                 case "test":
                 {
-                    var target = Dalamud.Objects.FirstOrDefault(o => o.Name.TextValue == "Voyage Control Panel");
-                    if (target == null)
-                        return;
-
-                    var oldFocusTarget = Dalamud.Targets.FocusTarget;
-                    Dalamud.Targets.SetFocusTarget(target);
-                    var focus = InterfaceManager.FocusTarget();
-                    if (!focus)
-                        return;
-
-                    Dalamud.Chat.Print(focus.TargetName());
-                    focus.Interact();
-                    Dalamud.Targets.SetFocusTarget(oldFocusTarget);
+                    var uiModule = (UIModule*) Dalamud.GameGui.GetUIModule();
+                    var agents   = uiModule->GetAgentModule();
+                    var agent    = agents->GetAgentByInternalId(AgentId.ContentsTimer);
+                    Dalamud.Chat.Print($"0x{(ulong) agent:X}");
                     break;
                 }
                 case "sig":

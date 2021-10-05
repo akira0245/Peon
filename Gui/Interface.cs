@@ -521,6 +521,13 @@ namespace Peon.Gui
                 Peon.Config.EnableLoginButtons = enableLoginButtons;
                 Save();
             }
+
+            var enableTimers = Peon.Config.EnableTimers;
+            if (ImGui.Checkbox("Enable Timers", ref enableTimers) && enableTimers != Peon.Config.EnableTimers)
+            {
+                Peon.Config.EnableTimers = enableTimers;
+                Save();
+            }
         }
 
 

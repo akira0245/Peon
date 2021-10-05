@@ -9,15 +9,20 @@ namespace Peon
 {
     public static unsafe class HookManagerExtension
     {
+        private delegate IntPtr Delegate3Ptr_Ptr(IntPtr a1, IntPtr a2, IntPtr a3);
+        private delegate void   Delegate3PtrInt(IntPtr a1, IntPtr a2, IntPtr a3, int a4);
         private delegate IntPtr Delegate2Ptr_Ptr(IntPtr a1, IntPtr a2);
         private delegate IntPtr Delegate2PtrInt_Ptr(IntPtr a1, IntPtr a2, uint a3);
         private delegate void   DelegateReceiveEvent(IntPtr atkUnit, ushort eventType, int which, IntPtr source, IntPtr unused);
         private delegate IntPtr Delegate4Ptr_Ptr(IntPtr a1, IntPtr a2, IntPtr a3, IntPtr a4);
         private delegate IntPtr DelegatePtr_Ptr(IntPtr a1);
+        private delegate IntPtr DelegatePtrByte_Ptr(IntPtr a1, byte a2);
         private delegate void   DelegatePtr(IntPtr a1);
+        private delegate void   DelegatePtrByte(IntPtr a1, byte a2);
 
         public static void SetHooks(this HookManager hooks)
         {
+            hooks.Create<Delegate3Ptr_Ptr>("FindResource",   0x1B6880, false, null, null, (Action<IntPtr, IntPtr, IntPtr, IntPtr>)FindResourcePost);
             hooks.Create<Delegate2Ptr_Ptr>("ResourceUnload", 0x1B2E60, false, (Func<IntPtr, IntPtr, bool>) ResourceUnloadCondition);
             hooks.Create<Delegate2PtrInt_Ptr>("IncRef", 0x1A2500, false, (Func<IntPtr, IntPtr, uint, bool>) IncRefCondition);
             hooks.Create<Delegate2PtrInt_Ptr>("DecRef", 0x1A24D0, false, (Func<IntPtr, IntPtr, uint, bool>) IncRefCondition);
@@ -29,10 +34,20 @@ namespace Peon
             hooks.Create<DelegateReceiveEvent>("ReceiveJournalResultEvent", 0xDF9000,  false, null, ReceiveEventData);
             hooks.Create<DelegateReceiveEvent>("ReceiveFocusTargetEvent",   0x101e6b0,  false, (Func<IntPtr, ushort, int, IntPtr, IntPtr, bool>) EventDataCondition, ReceiveEventData);
             hooks.Create<DelegateReceiveEvent>("ReceiveSelectStringEvent",   0xCDC310,  false, null, ReceiveEventData);
+            hooks.Create<DelegatePtrByte_Ptr>("Unk", 0x1a5770, false);
+            hooks.Create<DelegatePtr>("Unk2", 0x1a5150, false);
+            hooks.Create<Delegate3PtrInt>("Unk3", 0x1a23a0, false);
+            hooks.Create<DelegatePtrByte>("Airship", 0x2a0b20, false);
         }
 
         private static unsafe bool IncRefCondition(IntPtr a1, IntPtr a2, uint a3)
             => ((ResourceHandle*) a1)->FileName.ToString().EndsWith(".cmp");
+
+        private static void FindResourcePost(IntPtr a1, IntPtr a2, IntPtr a3, IntPtr a4)
+        {
+            var ext = $"{(char)*((byte*)a2 + 0x3)}{(char)*((byte*)a2 + 0x2)}{(char)*((byte*)a2 + 0x1)}";
+            PluginLog.Information($"{*(uint*) a1} - {*(uint*)a3} - {ext}: {a4:X16}");
+        }
 
         private static bool ResourceUnloadCondition(IntPtr a1, IntPtr a2)
         {

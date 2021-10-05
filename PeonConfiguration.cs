@@ -11,6 +11,7 @@ namespace Peon
         public          int                        Version            { get; set; }
         public          bool                       EnableNoBother     { get; set; } = true;
         public          bool                       EnableLoginButtons { get; set; } = true;
+        public          bool                       EnableTimers       { get; set; } = true;
         public readonly List<ChoiceBotherSet>      BothersYesNo             = new();
         public readonly List<TalkBotherSet>        BothersTalk              = new();
         public readonly List<QuestBotherSet>       BothersQuest             = new();

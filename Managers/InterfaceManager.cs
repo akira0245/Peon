@@ -25,6 +25,9 @@ namespace Peon.Managers
         private readonly GetUiObjectByNameDelegate? _getUiObjectByNameDelegate;
         private readonly bool                       _canGetUiObject;
 
+        public static unsafe bool IsReady(AtkUnitBase* ptr)
+            => ptr->UldManager.LoadedState == 3;
+
         public InterfaceManager()
         {
             _baseUiObject              = Service<GetBaseUiObject>.Get().Invoke() ?? IntPtr.Zero;
@@ -104,7 +107,7 @@ namespace Peon.Managers
             else
             {
                 var basePtr = (AtkUnitBase*) modulePtr.ToPointer();
-                if (basePtr->UldManager.LoadedState == 3 && (!info.RequiresVisible || basePtr->IsVisible) && (info.Predicate?.Invoke(modulePtr) ?? true))
+                if (IsReady(basePtr) && (!info.RequiresVisible || basePtr->IsVisible) && (info.Predicate?.Invoke(modulePtr) ?? true))
                     return modulePtr;
             }
 

@@ -238,6 +238,8 @@ namespace Peon.Utility
         public DynamicHook<T>? Create<T>(string name, int offset, bool enabled, Delegate? condition = null, Delegate? pre = null,
             Delegate? post = null) where T : Delegate
         {
+            if (enabled)
+                _enabled = true;
             var preExisting = _hooks.FirstOrDefault(h => h.Name == name);
             if (preExisting != null)
             {
@@ -248,7 +250,7 @@ namespace Peon.Utility
             try
             {
                 var hook = new DynamicHook<T>(name, offset, condition, pre, post);
-                if (!_enabled || !enabled)
+                if (!enabled)
                     hook.Disable();
                 _hooks.Add(hook);
                 return hook;
