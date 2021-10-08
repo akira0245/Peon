@@ -2,11 +2,14 @@
   "Author": "Ottermandias",
   "Name": "Peon",
   "Description": "Adds commands to automate some busywork and general quality of life.",
+  "Punchline": "Work, Work",
+  "Tags": [ "Automation", "Botting", "Quality of Life" ],
   "InternalName": "Peon",
-  "AssemblyVersion": "1.0.0.0",
-  "RepoUrl": "",
+  "AssemblyVersion": "1.0.0.1",
+  "RepoUrl": "https://github.com/Ottermandias/Peon",
   "ApplicableVersion": "any",
   "DalamudApiLevel": 4,
-  "LoadPriority": 69421
+  "LoadPriority": 69421,
+  "IconUrl": "https://imgur.com/a/3ByCEMc"
 }
  

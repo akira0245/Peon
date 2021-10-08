@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Dalamud.Logging;
 using Dalamud.Plugin;
 using Peon.Bothers;
 using Peon.Modules;
@@ -88,6 +89,7 @@ namespace Peon.Managers
                 task.SafeWait();
                 if (task.IsCanceled || task.Result == IntPtr.Zero)
                     return IntPtr.Zero;
+                PluginLog.Verbose("Reached Main Command");
 
                 PtrMainCommand main = task.Result;
                 main.System();
@@ -96,6 +98,7 @@ namespace Peon.Managers
                 task.SafeWait();
                 if (task.IsCanceled || task.Result == IntPtr.Zero)
                     return IntPtr.Zero;
+                PluginLog.Verbose("Reached ContextMenuTitle");
 
                 PtrContextMenuTitle menu = task.Result;
                 if (!menu.Select(StringId.LogOut.Cs()))

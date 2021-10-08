@@ -462,7 +462,7 @@ namespace Peon.Managers
             return true;
         }
 
-        private bool SelectCategory()
+        private unsafe bool SelectCategory()
         {
             switch (_retainerInfo.Category)
             {
@@ -499,7 +499,7 @@ namespace Peon.Managers
                 {
                     if (!_retainerMenu.Select(2))
                         goto default;
-                    var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut);
+                    var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut, ptr => ((PtrRetainerTaskAsk) ptr).AssignButton->IsEnabled);
                     Wait(task);
                     if (!task.IsCompleted || task.Result == IntPtr.Zero)
                         return Failure("Timeout while selecting category.");

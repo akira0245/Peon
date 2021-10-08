@@ -1,20 +1,23 @@
 [
-	{
-		"Author": "Ottermandias",
-		"Name": "Peon",
-		"Description": "Adds commands to automate some busywork and general quality of life.",
-		"InternalName": "Peon",
-		"AssemblyVersion": "1.0.0.0",
-		"TestingAssemblyVersion": "1.0.0.0",
-		"RepoUrl": "https://github.com/Ottermandias/Peon",
-		"ApplicableVersion": "any",
-		"DalamudApiLevel": 4,
-		"IsHide": "False",
-		"IsTestingExclusive": "False",
-		"DownloadCount": 1,
-		"LastUpdate": 1618608321,
-		"DownloadLinkInstall": "https://github.com/Ottermandias/Peon/raw/main/Peon.zip",
-		"DownloadLinkTesting": "https://github.com/Ottermandias/Peon/raw/main/Peon.zip",
-		"DownloadLinkUpdate": "https://github.com/Ottermandias/Peon/raw/main/Peon.zip",
-	}
+  {
+    "Author": "Ottermandias",
+    "Name": "Peon",
+    "Description": "Adds commands to automate some busywork and general quality of life.",
+    "Punchline": "Work, Work",
+    "Tags": [ "Automation", "Botting", "Quality of Life" ],
+    "InternalName": "Peon",
+    "AssemblyVersion": "1.0.0.1",
+    "TestingAssemblyVersion": "1.0.0.1",
+    "RepoUrl": "https://github.com/Ottermandias/Peon",
+    "ApplicableVersion": "any",
+    "DalamudApiLevel": 4,
+    "IsHide": "False",
+    "IsTestingExclusive": "False",
+    "DownloadCount": 1,
+    "LastUpdate": 1618608321,
+    "DownloadLinkInstall": "https://github.com/Ottermandias/Peon/raw/main/Peon.zip",
+    "DownloadLinkTesting": "https://github.com/Ottermandias/Peon/raw/main/Peon.zip",
+    "DownloadLinkUpdate": "https://github.com/Ottermandias/Peon/raw/main/Peon.zip",
+    "IconUrl": "https://imgur.com/a/3ByCEMc"
+  }
 ]
