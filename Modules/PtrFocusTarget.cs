@@ -19,10 +19,10 @@ namespace Peon.Modules
         public void Interact()
         {
             var       target = Pointer->UldManager.NodeList[9];
-            using var helper = new Module.ClickHelper(Pointer, target);
+            var helper = new Module.ClickHelper(Pointer, target);
             helper.Data[5] = (byte*) 0x184003;
             helper.Data[7] = (byte*) target;
-            using var eventData = new Module.EventData(true);
+            var eventData = new Module.EventData(true);
             Module.ClickAddon(Pointer, target, (EventType) 3, 0, eventData.Data, helper.Data);
         }
     }

@@ -8,6 +8,32 @@ namespace Peon.Modules
 {
     internal static unsafe class Module
     {
+        private const int MaxSize = 0x4000;
+
+        public static byte** GlobalData;
+        public static int    Offset;
+
+        public static void Initialize()
+        {
+            GlobalData = (byte**) Marshal.AllocHGlobal(0x4000).ToPointer();
+            Offset     = 0;
+        }
+
+        private static byte** GetLocalData()
+        {
+            var ret = GlobalData + Offset;
+            if (Offset < MaxSize - 0x40)
+                Offset += 0x40;
+            else
+                Offset = 0;
+            return ret;
+        }
+
+        public static void Dispose()
+        {
+            Marshal.FreeHGlobal((IntPtr) GlobalData);
+        }
+
         public static T* Cast<T>(IntPtr ptr) where T : unmanaged
             => (T*) ptr.ToPointer();
 
@@ -28,13 +54,13 @@ namespace Peon.Modules
 
         public delegate bool ListCallbackDelegate(AtkComponentListItemRenderer* listItem);
 
-        public readonly struct ClickHelper : IDisposable
+        public readonly struct ClickHelper
         {
             public readonly byte** Data;
 
             public ClickHelper(void* window, void* target)
             {
-                Data    = (byte**) Marshal.AllocHGlobal(0x40).ToPointer();
+                Data    = GetLocalData();
                 Data[0] = null;
                 Data[1] = (byte*) target;
                 Data[2] = (byte*) window;
@@ -45,25 +71,15 @@ namespace Peon.Modules
                 Data[7] = null;
                 Data[8] = null;
             }
-
-            public void Dispose()
-            {
-                var ptr = new IntPtr(Data);
-                Task.Run(() =>
-                {
-                    Task.Delay(10000).Wait();
-                    Marshal.FreeHGlobal(ptr);
-                });
-            }
         }
 
-        public readonly struct EventData : IDisposable
+        public readonly struct EventData
         {
             public readonly byte** Data;
 
             public EventData(AtkComponentListItemRenderer* pointer, ushort idx)
             {
-                Data    = (byte**) Marshal.AllocHGlobal(0x18).ToPointer();
+                Data    = GetLocalData();
                 Data[0] = (byte*) pointer;
                 Data[1] = null;
                 Data[2] = (byte*) (idx | ((ulong) idx << 48));
@@ -71,7 +87,7 @@ namespace Peon.Modules
 
             public EventData(void* dragDropNode, void* unk)
             {
-                Data    = (byte**) Marshal.AllocHGlobal(0x18).ToPointer();
+                Data    = GetLocalData();
                 Data[0] = (byte*) unk;
                 Data[1] = (byte*) dragDropNode;
                 Data[2] = (byte*) 0x0805;
@@ -79,25 +95,15 @@ namespace Peon.Modules
 
             public EventData(int toNewValue, int fromValue = 0)
             {
-                Data    = (byte**) Marshal.AllocHGlobal(0x18).ToPointer();
+                Data    = GetLocalData();
                 Data[0] = (byte*) toNewValue;
                 Data[1] = (byte*) fromValue;
             }
 
             public EventData(bool rightClick)
             {
-                Data    = (byte**)Marshal.AllocHGlobal(0x18).ToPointer();
-                Data[0] = (byte*)0x0001000000000000;
-            }
-
-            public void Dispose()
-            {
-                var ptr = new IntPtr(Data);
-                Task.Run(() =>
-                {
-                    Task.Delay(10000).Wait();
-                    Marshal.FreeHGlobal(ptr);
-                });
+                Data    = GetLocalData();
+                Data[0] = (byte*) 0x0001000000000000;
             }
 
             public static EventData CreateEmpty()
@@ -114,25 +120,25 @@ namespace Peon.Modules
 
         public static void ClickAddon(void* addon, void* target, EventType type, int which, void* eventData, void* helper)
         {
-            var       receiveEvent = ObtainReceiveEventDelegate(addon);
-            receiveEvent(addon, (ushort)type, which, helper, eventData);
+            var receiveEvent = ObtainReceiveEventDelegate(addon);
+            receiveEvent(addon, (ushort) type, which, helper, eventData);
         }
 
         public static void ClickAddon(void* addon, void* target, EventType type, int which, void* eventData)
         {
-            using var helper       = new ClickHelper(addon, target);
+            var helper = new ClickHelper(addon, target);
             ClickAddon(addon, target, type, which, eventData, helper.Data);
         }
 
         public static void ClickAddonHelper(void* addon, void* target, EventType type, int which, void* helper)
         {
-            using var eventData = EventData.CreateEmpty();
+            var eventData = EventData.CreateEmpty();
             ClickAddon(addon, target, type, which, eventData.Data, helper);
         }
 
         public static void ClickAddon(void* addon, void* target, EventType type, int which)
         {
-            using var eventData = EventData.CreateEmpty();
+            var eventData = EventData.CreateEmpty();
             ClickAddon(addon, target, type, which, eventData.Data);
         }
 
@@ -143,9 +149,9 @@ namespace Peon.Modules
             if (idx < 0 || idx >= list->ListLength)
                 return false;
 
-            using var data   = new EventData(list->ItemRendererList[idx].AtkComponentListItemRenderer, (ushort) idx);
-            using var helper = new ClickHelper(addon, node);
-            helper.Data[5] = (byte*)0x40023;
+            var data   = new EventData(list->ItemRendererList[idx].AtkComponentListItemRenderer, (ushort) idx);
+            var helper = new ClickHelper(addon, node);
+            helper.Data[5] = (byte*) 0x40023;
             ClickAddon(addon, node, EventType.ListIndexChange, value, data.Data, helper.Data);
             return true;
         }
@@ -159,8 +165,8 @@ namespace Peon.Modules
                 if (!callback(renderer))
                     continue;
 
-                using var data   = new EventData(renderer, (ushort) i);
-                using var helper = new ClickHelper(addon, node);
+                var data   = new EventData(renderer, (ushort) i);
+                var helper = new ClickHelper(addon, node);
                 helper.Data[5] = (byte*) 0x40023;
 
                 ClickAddon(addon, node, EventType.ListIndexChange, value, data.Data, helper.Data);

@@ -55,7 +55,7 @@ namespace Peon.Modules
                 if (!callback(renderer))
                     continue;
 
-                using var data = new Module.EventData(renderer, (ushort) i);
+                var data = new Module.EventData(renderer, (ushort) i);
                 Module.ClickAddon(Pointer, list, (EventType) 0x23, 1, data.Data);
                 return true;
             }

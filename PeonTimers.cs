@@ -42,7 +42,7 @@ namespace Peon
                 Machines[freeCompany] = machineList;
             }
 
-            if (machineList.TryGetValue(machine, out var oldTime) && oldTime.Item1 == time)
+            if (machineList.TryGetValue(machine, out var oldTime) && Math.Abs((oldTime.Item1 - time).TotalMinutes) < 1)
                 return false;
             machineList[machine] = (time, type);
             return true;

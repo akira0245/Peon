@@ -37,7 +37,7 @@ namespace Peon.Modules
 
         public void Minus()
         {
-            using Module.EventData data = new(int.MaxValue);
+            Module.EventData data = new(int.MaxValue);
             Module.ClickAddon(Pointer, NumberInput, (EventType) 0x1B, NumberInputId, data.Data);
             Proceed();
         }

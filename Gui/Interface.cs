@@ -526,6 +526,10 @@ namespace Peon.Gui
             if (ImGui.Checkbox("Enable Timers", ref enableTimers) && enableTimers != Peon.Config.EnableTimers)
             {
                 Peon.Config.EnableTimers = enableTimers;
+                if (enableTimers)
+                    _peon.TimerManager.SetMessage();
+                else
+                    _peon.TimerManager.RemoveMessage();
                 Save();
             }
         }

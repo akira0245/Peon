@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Dalamud.Game.Command;
+using Dalamud.Game.Network;
 using Dalamud.Plugin;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
@@ -18,6 +19,7 @@ using Peon.Modules;
 using Peon.SeFunctions;
 using Peon.Utility;
 using CommandManager = Peon.Managers.CommandManager;
+using Module = Peon.Modules.Module;
 
 namespace Peon
 {
@@ -76,6 +78,7 @@ namespace Peon
             Dalamud.Initialize(pluginInterface);
             DebuggerCheck = new DebuggerCheck(Dalamud.SigScanner);
             DebuggerCheck.NopOut();
+            Module.Initialize();
 
             Localization = new Localization();
             LazyString.SetLocalization(Localization);
@@ -154,9 +157,9 @@ namespace Peon
                 HelpMessage = "",
                 ShowInHelp  = false,
             });
-
             Hooks.SetHooks();
         }
+
 
         private static void OnKill(string command, string _)
         {
@@ -165,6 +168,7 @@ namespace Peon
 
         public void Dispose()
         {
+            TimerManager.Dispose();
             TimerWindow.Dispose();
             Hooks.Dispose();
             LoginBar?.Dispose();
@@ -179,6 +183,7 @@ namespace Peon
             Dalamud.Commands.RemoveHandler("/craft");
             Dalamud.Commands.RemoveHandler("/dev");
             Dalamud.Commands.RemoveHandler("/xlkill");
+            Module.Dispose();
             DebuggerCheck.Dispose();
         }
 

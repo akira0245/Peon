@@ -28,7 +28,7 @@ namespace Peon.Modules
                 var icon      = component->AtkComponentBase.UldManager.NodeList[2];
                 if (frame->IsVisible && icon->IsVisible)
                 {
-                    using Module.EventData data = new(item, (byte*)component + DataOffset);
+                    Module.EventData data = new(item, (byte*)component + DataOffset);
                     Module.ClickAddon(Pointer, item, EventType.Unk37, MaxIndex - i, data.Data);
                     return true;
                 }

@@ -33,7 +33,7 @@ namespace Peon.Modules
 
         public bool IsReady()
         {
-            var node   = ((AtkTextNode*) Pointer->UldManager.NodeList[18]);
+            var node = (AtkTextNode*) Pointer->UldManager.NodeList[18];
             return node->NodeText.IsEmpty == 0;
         }
 
@@ -41,8 +41,8 @@ namespace Peon.Modules
         {
             var button = Pointer->UldManager.NodeList[8];
 
-            var       id     = yesNo ? PurchaseButtonId : CancelButtonId;
-            using var helper = new Module.ClickHelper(Pointer, button);
+            var id     = yesNo ? PurchaseButtonId : CancelButtonId;
+            var helper = new Module.ClickHelper(Pointer, button);
             helper.Data[3] = (byte*) id;
 
             Module.ClickAddonHelper(Pointer, yesNo ? PurchaseButton : CancelButton, EventType.Change, id, helper.Data);
