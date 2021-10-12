@@ -5,8 +5,8 @@
 		<LangVersion>preview</LangVersion>
 		<RootNamespace>Peon</RootNamespace>
 		<AssemblyName>Peon</AssemblyName>
-		<FileVersion>1.0.0.1</FileVersion>
-    <AssemblyVersion>1.0.0.1</AssemblyVersion>
+		<FileVersion>1.0.0.2</FileVersion>
+    <AssemblyVersion>1.0.0.2</AssemblyVersion>
 		<Company>SoftOtter</Company>
     <Product>Peon</Product>
     <Copyright>Copyright © 2020</Copyright>
