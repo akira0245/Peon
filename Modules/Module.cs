@@ -23,7 +23,7 @@ namespace Peon.Modules
         private static byte** GetLocalData()
         {
             var ret = GlobalData + Offset / sizeof(byte*);
-            if (Offset < MaxSize - 0x48)
+            if (Offset < MaxSize - 2 * 0x48)
                 Offset += 0x48;
             else
                 Offset = 0;
