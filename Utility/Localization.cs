@@ -57,7 +57,7 @@ namespace Peon.Utility
 
     public class Localization
     {
-        private readonly List<string>           _strings;
+        private readonly List<string> _strings;
 
         public Localization()
         {
@@ -102,6 +102,18 @@ namespace Peon.Utility
             }
         }
 
+        private static readonly char[] _openBrackets =
+        {
+            '(',
+            '[',
+        };
+
+        private static readonly char[] _closeBrackets =
+        {
+            ')',
+            ']',
+        };
+
         private void SetRetainers()
         {
             var placeName = Dalamud.GameData.GetExcelSheet<PlaceName>(Dalamud.ClientState.ClientLanguage)!;
@@ -124,8 +136,9 @@ namespace Peon.Utility
             Set(StringId.QuickExploration,       retainer.GetRow(30053)!.Name.ToString().ToLowerInvariant());
             Set(StringId.EntrustGil,             sheet.GetRow(156)!.String.ToString());
             Set(StringId.RetainerReturn,         sheet.GetRow(192)!.String.ToString());
-            Set(StringId.RetainerMenuComplete,   sheet.GetRow(168)!.String.ToString().Split('(')[1].TrimEnd(')'));
-            Set(StringId.RetainerMenuNone,       sheet.GetRow(166)!.String.ToString().Split('(')[1].TrimEnd(')'));
+            var x = sheet.GetRow(168)!.String.ToString();
+            Set(StringId.RetainerMenuComplete, sheet.GetRow(168)!.String.ToString().Split(_openBrackets)[1].TrimEnd(_closeBrackets));
+            Set(StringId.RetainerMenuNone, sheet.GetRow(166)!.String.ToString().Split(_openBrackets)[1].TrimEnd(_closeBrackets));
         }
 
         private void SetLogin()

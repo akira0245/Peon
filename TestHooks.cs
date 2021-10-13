@@ -19,6 +19,7 @@ namespace Peon
         private delegate IntPtr DelegatePtrByte_Ptr(IntPtr a1, byte a2);
         private delegate void   DelegatePtr(IntPtr a1);
         private delegate void   DelegatePtrByte(IntPtr a1, byte a2);
+        private delegate void   DelegatePtrShort(IntPtr a1, ushort a2);
 
         public static void SetHooks(this HookManager hooks)
         {
@@ -37,7 +38,8 @@ namespace Peon
             hooks.Create<DelegatePtrByte_Ptr>("Unk", 0x1a5770, false);
             hooks.Create<DelegatePtr>("Unk2", 0x1a5150, false);
             hooks.Create<Delegate3PtrInt>("Unk3", 0x1a23a0, false);
-            hooks.Create<DelegatePtrByte>("Airship", 0x2a0b20, false);
+            hooks.Create<DelegatePtrByte>("Airship",        0x2a0b20, false);
+            hooks.Create<DelegatePtrByte>("TerritorySetup", 0xA99C00, false);
         }
 
         private static unsafe bool IncRefCondition(IntPtr a1, IntPtr a2, uint a3)

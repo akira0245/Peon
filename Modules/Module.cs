@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Dalamud.Logging;
@@ -8,24 +9,25 @@ namespace Peon.Modules
 {
     internal static unsafe class Module
     {
-        private const int MaxSize = 0x4000;
+        private const int MaxSize = 0x4800;
 
         public static byte** GlobalData;
         public static int    Offset;
 
         public static void Initialize()
         {
-            GlobalData = (byte**) Marshal.AllocHGlobal(0x4000).ToPointer();
+            GlobalData = (byte**) Marshal.AllocHGlobal(MaxSize).ToPointer();
             Offset     = 0;
         }
 
         private static byte** GetLocalData()
         {
-            var ret = GlobalData + Offset;
-            if (Offset < MaxSize - 0x40)
-                Offset += 0x40;
+            var ret = GlobalData + Offset / sizeof(byte*);
+            if (Offset < MaxSize - 0x48)
+                Offset += 0x48;
             else
                 Offset = 0;
+            Debug.Assert((ulong) ret < (ulong) GlobalData + MaxSize - 0x48);
             return ret;
         }
 
@@ -98,12 +100,15 @@ namespace Peon.Modules
                 Data    = GetLocalData();
                 Data[0] = (byte*) toNewValue;
                 Data[1] = (byte*) fromValue;
+                Data[2] = null;
             }
 
             public EventData(bool rightClick)
             {
                 Data    = GetLocalData();
                 Data[0] = (byte*) 0x0001000000000000;
+                Data[1] = null;
+                Data[2] = null;
             }
 
             public static EventData CreateEmpty()
