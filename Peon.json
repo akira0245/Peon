@@ -5,7 +5,7 @@
   "Punchline": "Work, Work",
   "Tags": [ "Automation", "Botting", "Quality of Life" ],
   "InternalName": "Peon",
-  "AssemblyVersion": "1.0.0.2",
+  "AssemblyVersion": "1.0.0.3",
   "RepoUrl": "https://github.com/Ottermandias/Peon",
   "ApplicableVersion": "any",
   "DalamudApiLevel": 4,
