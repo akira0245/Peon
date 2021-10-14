@@ -106,7 +106,7 @@ namespace Peon.Managers
             }
             else
             {
-                var basePtr = (AtkUnitBase*) modulePtr.ToPointer();
+                var basePtr = (AtkUnitBase*) modulePtr;
                 if (IsReady(basePtr) && (!info.RequiresVisible || basePtr->IsVisible) && (info.Predicate?.Invoke(modulePtr) ?? true))
                     return modulePtr;
             }

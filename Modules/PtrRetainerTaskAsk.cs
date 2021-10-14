@@ -5,8 +5,6 @@ namespace Peon.Modules
 {
     public unsafe struct PtrRetainerTaskAsk
     {
-        private const int AssignOffset   = 0x2A8;
-        private const int ReturnOffset   = 0x2B0;
         private const int ReturnButtonId = 2;
         private const int AssignButtonId = 1;
 
@@ -18,16 +16,19 @@ namespace Peon.Modules
         public static implicit operator bool(PtrRetainerTaskAsk ptr)
             => ptr.Pointer != null;
 
-        public AtkComponentButton* ConfirmButton
-            => (AtkComponentButton*) ((byte*) Pointer + ReturnOffset);
+        public AtkComponentNode* ReturnButton
+            => (AtkComponentNode*) Pointer->UldManager.NodeList[3];
 
-        public AtkComponentButton* AssignButton
-            => (AtkComponentButton*) ((byte*) Pointer + AssignOffset);
+        public AtkComponentNode* AssignButton
+            => (AtkComponentNode*) Pointer->UldManager.NodeList[4];
+
+        public bool IsReady
+            => AssignButton != null && (AssignButton->AtkResNode.Flags & (1 << 5)) != 0;
 
         public void Return()
-            => Module.ClickAddon(Pointer, ConfirmButton->AtkComponentBase.OwnerNode, EventType.Change, ReturnButtonId);
+            => Module.ClickAddon(Pointer, ReturnButton, EventType.Change, ReturnButtonId);
 
         public void Assign()
-            => Module.ClickAddon(Pointer, AssignButton->AtkComponentBase.OwnerNode, EventType.Change, AssignButtonId);
+            => Module.ClickAddon(Pointer, AssignButton, EventType.Change, AssignButtonId);
     }
 }

@@ -126,13 +126,14 @@ namespace Peon.Utility
                     Dalamud.ClientState.ClientLanguage.ToLumina(),
                     null,
                 }) as ExcelSheet<RetainerString>;
+            var addon = Dalamud.GameData.GetExcelSheet<Addon>(Dalamud.ClientState.ClientLanguage)!;
 
             Set(StringId.SelectCategory,         sheet!.GetRow(194)!.String);
             Set(StringId.SelectOption,           sheet.GetRow(154)!.String);
             Set(StringId.SummoningBell,          placeName.GetRow(1235)!.Name);
-            Set(StringId.RetainerTaskComplete,   sheet.GetRow(168)!.String);
-            Set(StringId.RetainerTaskAvailable,  sheet.GetRow(165)!.String);
-            Set(StringId.RetainerTaskInProgress, sheet.GetRow(167)!.String);
+            Set(StringId.RetainerTaskComplete,   addon.GetRow(2385)!.Text.ToString());
+            Set(StringId.RetainerTaskAvailable,  addon.GetRow(2386)!.Text.ToString());
+            Set(StringId.RetainerTaskInProgress, addon.GetRow(2384)!.Text.Payloads[0].RawString!);
             Set(StringId.QuickExploration,       retainer.GetRow(30053)!.Name.ToString().ToLowerInvariant());
             Set(StringId.EntrustGil,             sheet.GetRow(156)!.String.ToString());
             Set(StringId.RetainerReturn,         sheet.GetRow(192)!.String.ToString());

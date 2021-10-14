@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Dalamud.Logging;
+using Dalamud.Memory;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace Peon.Modules
@@ -40,7 +41,7 @@ namespace Peon.Modules
             => (T*) ptr.ToPointer();
 
         public static string TextNodeToString(AtkTextNode* node)
-            => Marshal.PtrToStringAnsi(new IntPtr(node->NodeText.StringPtr))!;
+            => MemoryHelper.ReadStringNullTerminated((IntPtr) node->NodeText.StringPtr)!;
 
         public static string ImageNodeToTexture(AtkImageNode* node)
         {

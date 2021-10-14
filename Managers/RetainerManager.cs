@@ -499,7 +499,7 @@ namespace Peon.Managers
                 {
                     if (!_retainerMenu.Select(2))
                         goto default;
-                    var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut, ptr => ((PtrRetainerTaskAsk) ptr).AssignButton->IsEnabled);
+                    var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut, ptr => ((PtrRetainerTaskAsk) ptr).IsReady);
                     Wait(task);
                     if (!task.IsCompleted || task.Result == IntPtr.Zero)
                         return Failure("Timeout while selecting category.");
@@ -548,7 +548,7 @@ namespace Peon.Managers
             if (!_taskList.Select(_retainerInfo.Item))
                 return Failure($"Item index {_retainerInfo.Item} not available.");
 
-            var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut, ptr => ((PtrRetainerTaskAsk)ptr).AssignButton->IsEnabled);
+            var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut, ptr => ((PtrRetainerTaskAsk)ptr).IsReady);
             Wait(task);
             if (!task.IsCompleted || task.Result == IntPtr.Zero)
                 return Failure("Timeout while selecting item.");
@@ -563,7 +563,7 @@ namespace Peon.Managers
         private unsafe bool Reassign()
         {
             _taskResult.Reassign();
-            var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut, ptr => ((PtrRetainerTaskAsk)ptr).AssignButton->IsEnabled);
+            var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut, ptr => ((PtrRetainerTaskAsk)ptr).IsReady);
             Wait(task);
             if (!task.IsCompleted || task.Result == IntPtr.Zero)
                 return Failure("Timeout while obtaining new venture target.");

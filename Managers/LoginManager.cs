@@ -10,11 +10,11 @@ namespace Peon.Managers
 {
     public class LoginManager
     {
-        private readonly InterfaceManager       _interfaceManager;
-        private readonly BotherHelper           _botherHelper;
-        private          string                 _lastCharacterName = string.Empty;
-        private          string[]?              _characters;
-        private          bool                   _running;
+        private readonly InterfaceManager _interfaceManager;
+        private readonly BotherHelper     _botherHelper;
+        private          string           _lastCharacterName = string.Empty;
+        private          string[]?        _characters;
+        private          bool             _running;
 
         public LoginManager(BotherHelper botherHelper, InterfaceManager interfaceManager)
         {
@@ -89,6 +89,7 @@ namespace Peon.Managers
                 task.SafeWait();
                 if (task.IsCanceled || task.Result == IntPtr.Zero)
                     return IntPtr.Zero;
+
                 PluginLog.Verbose("Reached Main Command");
 
                 PtrMainCommand main = task.Result;
@@ -98,6 +99,7 @@ namespace Peon.Managers
                 task.SafeWait();
                 if (task.IsCanceled || task.Result == IntPtr.Zero)
                     return IntPtr.Zero;
+
                 PluginLog.Verbose("Reached ContextMenuTitle");
 
                 PtrContextMenuTitle menu = task.Result;
@@ -130,18 +132,21 @@ namespace Peon.Managers
             var idx = Array.IndexOf(_characters, _lastCharacterName);
             idx = (idx + (previous ? -1 : 1)) % _characters.Length;
 
+            _botherHelper._selectNextYesNo = true;
             return chara.Select(idx);
         }
 
         private bool SpecificCharacter(string character, IntPtr charaSelect)
         {
             PtrCharaSelectListMenu chara = charaSelect;
+            _botherHelper._selectNextYesNo = true;
             return chara.Select(new CompareString(character, MatchType.CiContains));
         }
 
         private bool SpecificCharacter(int idx, IntPtr charaSelect)
         {
             PtrCharaSelectListMenu chara = charaSelect;
+            _botherHelper._selectNextYesNo = true;
             return chara.Select(idx);
         }
     }
