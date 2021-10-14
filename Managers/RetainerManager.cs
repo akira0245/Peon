@@ -543,12 +543,12 @@ namespace Peon.Managers
             return true;
         }
 
-        private bool SelectItem()
+        private unsafe bool SelectItem()
         {
             if (!_taskList.Select(_retainerInfo.Item))
                 return Failure($"Item index {_retainerInfo.Item} not available.");
 
-            var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut);
+            var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut, ptr => ((PtrRetainerTaskAsk)ptr).AssignButton->IsEnabled);
             Wait(task);
             if (!task.IsCompleted || task.Result == IntPtr.Zero)
                 return Failure("Timeout while selecting item.");
@@ -560,10 +560,10 @@ namespace Peon.Managers
         }
 
 
-        private bool Reassign()
+        private unsafe bool Reassign()
         {
             _taskResult.Reassign();
-            var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut);
+            var task = Interface.Add("RetainerTaskAsk", true, DefaultTimeOut, ptr => ((PtrRetainerTaskAsk)ptr).AssignButton->IsEnabled);
             Wait(task);
             if (!task.IsCompleted || task.Result == IntPtr.Zero)
                 return Failure("Timeout while obtaining new venture target.");

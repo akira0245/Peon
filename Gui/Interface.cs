@@ -576,6 +576,23 @@ namespace Peon.Gui
                 if (_peon.OhBother._selectNextString != null)
                     ImGui.Text("Trying to select next string.");
             }
+
+            if (ImGui.CollapsingHeader("Strings"))
+            {
+                if (ImGui.BeginTable("##stringDebugTable", 2, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg))
+                {
+                    foreach (StringId id in Enum.GetValues(typeof(StringId)))
+                    {
+                        ImGui.TableNextRow();
+                        ImGui.TableNextColumn();
+                        ImGui.Text(id.ToString());
+                        ImGui.TableNextColumn();
+                        ImGui.Text(_peon.Localization[id]);
+                    }
+
+                    ImGui.EndTable();
+                }
+            }
         }
 
         private void Draw()
