@@ -7,10 +7,14 @@ namespace Peon.Gui
 {
     public sealed class ImGuiRaii : IDisposable
     {
-        private int _colorStack;
-        private int _fontStack;
-        private int _styleStack;
+        private bool  _lastState;
+        private int   _colorStack;
+        private int   _fontStack;
+        private int   _styleStack;
         private float _indentation;
+
+        public static implicit operator bool(ImGuiRaii r)
+            => r._lastState;
 
         private Stack<Action>? _onDispose;
 
@@ -116,12 +120,14 @@ namespace Peon.Gui
         {
             if (begin())
             {
+                _lastState =   true;
                 _onDispose ??= new Stack<Action>();
                 _onDispose.Push(end);
-                return true;
             }
+            else
+                _lastState = false;
 
-            return false;
+            return _lastState;
         }
 
         public ImGuiRaii Begin(Action begin, Action end)

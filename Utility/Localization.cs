@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Dalamud;
+using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Logging;
 using Dalamud.Plugin;
 using Lumina;
@@ -14,6 +15,7 @@ using Lumina.Excel.GeneratedSheets;
 using Lumina.Text.Payloads;
 using Peon.Bothers;
 using Peon.Crafting;
+using Peon.Managers;
 using Action = Lumina.Excel.GeneratedSheets.Action;
 
 namespace Peon.Utility
@@ -68,6 +70,7 @@ namespace Peon.Utility
             SetLogin();
             SetRetainers();
             SetTargeting();
+            SetCrops();
         }
 
         private void Set(StringId s, string value)
@@ -139,7 +142,7 @@ namespace Peon.Utility
             Set(StringId.RetainerReturn,         sheet.GetRow(192)!.String.ToString());
             var x = sheet.GetRow(168)!.String.ToString();
             Set(StringId.RetainerMenuComplete, sheet.GetRow(168)!.String.ToString().Split(_openBrackets)[1].TrimEnd(_closeBrackets));
-            Set(StringId.RetainerMenuNone, sheet.GetRow(166)!.String.ToString().Split(_openBrackets)[1].TrimEnd(_closeBrackets));
+            Set(StringId.RetainerMenuNone,     sheet.GetRow(166)!.String.ToString().Split(_openBrackets)[1].TrimEnd(_closeBrackets));
         }
 
         private void SetLogin()
@@ -193,6 +196,51 @@ namespace Peon.Utility
             Set(StringId.TargetTooFarAbove,     log.GetRow(1317)!.Text);
             Set(StringId.TargetInvalidLocation, log.GetRow(1308)!.Text);
             Set(StringId.CannotSeeTarget,       log.GetRow(1315)!.Text);
+        }
+
+        private string GetCorrectPayload(Lumina.Text.SeString s, int idxEn, int idxFr, int idxJp, int idxDe)
+        {
+            return Dalamud.ClientState.ClientLanguage switch
+            {
+                ClientLanguage.English  => ((TextPayload) s.Payloads[idxEn < 0 ? idxEn + s.Payloads.Count : idxEn]).RawString,
+                ClientLanguage.French   => ((TextPayload) s.Payloads[idxFr < 0 ? idxFr + s.Payloads.Count : idxFr]).RawString,
+                ClientLanguage.Japanese => ((TextPayload) s.Payloads[idxJp < 0 ? idxJp + s.Payloads.Count : idxJp]).RawString,
+                ClientLanguage.German   => ((TextPayload) s.Payloads[idxDe < 0 ? idxDe + s.Payloads.Count : idxDe]).RawString,
+                _                       => ((TextPayload) s.Payloads[idxEn < 0 ? idxEn + s.Payloads.Count : idxEn]).RawString,
+            };
+        }
+
+        private void SetCrops()
+        {
+            Dalamud.GameData.Excel.RemoveSheetFromCache<RetainerString>();
+            var sheet = Dalamud.GameData.Excel.GetType().GetMethod("GetSheet", BindingFlags.Instance | BindingFlags.NonPublic)!
+               .MakeGenericMethod(typeof(RetainerString)).Invoke(Dalamud.GameData.Excel, new object?[]
+                {
+                    "custom/001/cmndefhousinggardeningplant_00151",
+                    Dalamud.ClientState.ClientLanguage.ToLumina(),
+                    null,
+                }) as ExcelSheet<RetainerString>;
+            var addon       = Dalamud.GameData.GetExcelSheet<Addon>(Dalamud.ClientState.ClientLanguage)!;
+            var territories = Dalamud.GameData.Excel.GetSheet<TerritoryType>()!;
+            var names       = Dalamud.GameData.Excel.GetSheet<PlaceName>()!;
+
+
+            Set(StringId.TendCrop,       sheet!.GetRow(4)!.String.RawString);
+            Set(StringId.FertilizeCrop,  sheet.GetRow(3)!.String.RawString);
+            Set(StringId.RemoveCrop,     sheet.GetRow(5)!.String.RawString);
+            Set(StringId.HarvestCrop,    sheet.GetRow(6)!.String.RawString);
+            Set(StringId.PlantCrop,      sheet.GetRow(2)!.String.RawString);
+            Set(StringId.DisposeCrop,    sheet.GetRow(11)!.String.RawString);
+            Set(StringId.CropBeyondHope, GetCorrectPayload(sheet.GetRow(7)!.String,  -1, -1, -1, 0));
+            Set(StringId.CropDoingWell,  GetCorrectPayload(sheet.GetRow(8)!.String,  -1, -1, -1, 0));
+            Set(StringId.CropBetterDays, GetCorrectPayload(sheet.GetRow(9)!.String,  -1, -1, -1, 0));
+            Set(StringId.CropReady,      GetCorrectPayload(sheet.GetRow(10)!.String, -1, -1, -1, 0));
+            Set(StringId.CropPrepareBed, GetCorrectPayload(addon.GetRow(6413)!.Text, 0,  0,  -1, -1));
+            Set(StringId.Mist,           names.GetRow(territories.GetRow((uint) HousingZones.Mist)!.PlaceName.Row)!.Name.RawString);
+            Set(StringId.LavenderBeds,   names.GetRow(territories.GetRow((uint) HousingZones.LavenderBeds)!.PlaceName.Row)!.Name.RawString);
+            Set(StringId.Goblet,         names.GetRow(territories.GetRow((uint) HousingZones.Goblet)!.PlaceName.Row)!.Name.RawString);
+            Set(StringId.Shirogane,      names.GetRow(territories.GetRow((uint) HousingZones.Shirogane)!.PlaceName.Row)!.Name.RawString);
+            Set(StringId.Firmament, "Firmament"); //names.GetRow(territories.GetRow((uint)HousingZones.Firmament)!.PlaceName.Row)!.Name.RawString);
         }
     }
 
@@ -266,6 +314,24 @@ namespace Peon.Utility
         TargetTooFarBelow,
         TargetTooFarAbove,
         TargetInvalidLocation,
+
+        // Crops
+        TendCrop,
+        FertilizeCrop,
+        RemoveCrop,
+        HarvestCrop,
+        PlantCrop,
+        DisposeCrop,
+        CropBeyondHope,
+        CropDoingWell,
+        CropBetterDays,
+        CropReady,
+        CropPrepareBed,
+        Mist,
+        LavenderBeds,
+        Goblet,
+        Shirogane,
+        Firmament,
     }
 
     public static class StringIdExtensions

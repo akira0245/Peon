@@ -5,9 +5,9 @@ namespace Peon.Modules
 {
     public unsafe struct PtrSelectYesno
     {
-        private const int YesButtonId = 0;
-        private const int NoButtonId  = 1;
-        private const int CheckmarkId = 3;
+        public const int YesButtonId = 0;
+        public const int NoButtonId  = 1;
+        public const int CheckmarkId = 3;
 
         public AddonSelectYesno* Pointer;
 

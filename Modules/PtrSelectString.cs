@@ -22,7 +22,7 @@ namespace Peon.Modules
             => Module.ClickList(&Pointer->PopupMenu.vtbl, Pointer->PopupMenu.List->AtkComponentBase.OwnerNode, idx);
 
         public string Description()
-            => Module.TextNodeToString((AtkTextNode*) Pointer->AtkUnitBase.RootNode->ChildNode->PrevSiblingNode->PrevSiblingNode);
+            => Module.TextNodeToString((AtkTextNode*) Pointer->AtkUnitBase.UldManager.NodeList[3]);
 
         public int Count
             => Pointer->PopupMenu.List->ListLength;

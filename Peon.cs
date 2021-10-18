@@ -62,6 +62,7 @@ namespace Peon
         {
             // Addresses.
             Service<GetBaseUiObject>.Set(Dalamud.SigScanner);
+            Service<PositionInfoAddress>.Set(Dalamud.SigScanner);
             Service<GetUiObjectByName>.Set(Dalamud.SigScanner);
             Service<InputKey>.Set(Dalamud.SigScanner);
             Service<SelectStringOnSetup>.Set(Dalamud.SigScanner);
@@ -69,6 +70,8 @@ namespace Peon
             Service<TextErrorOnChange>.Set(Dalamud.SigScanner);
             Service<YesNoOnSetup>.Set(Dalamud.SigScanner);
             Service<JournalResultOnSetup>.Set(Dalamud.SigScanner);
+            Service<SelectStringReceiveEvent>.Set(Dalamud.SigScanner);
+            Service<SelectYesnoReceiveEvent>.Set(Dalamud.SigScanner);
         }
 
         public unsafe Peon(DalamudPluginInterface pluginInterface)
@@ -82,11 +85,10 @@ namespace Peon
 
             Localization = new Localization();
             LazyString.SetLocalization(Localization);
-            Config = PeonConfiguration.Load();
-            Timers = PeonTimers.Load();
-
-            Interface = new Interface(this);
+            Config    = PeonConfiguration.Load();
+            Timers    = PeonTimers.Load();
             SetupServices();
+            Interface        = new Interface(this);
             InterfaceManager = new InterfaceManager();
             Addons           = new AddonWatcher();
             InputManager     = new InputManager();
@@ -100,7 +102,7 @@ namespace Peon
             BaseAddress      = Dalamud.SigScanner.Module.BaseAddress.ToInt64();
             LoginBar         = new LoginBar(Login, InterfaceManager);
             Board            = new BoardManager(Targeting, Addons, OhBother, InterfaceManager);
-            TimerManager     = new TimerManager(InterfaceManager);
+            TimerManager     = new TimerManager(InterfaceManager, Addons);
             TimerWindow      = new TimerWindow(TimerManager);
 
             _itemSheet = Dalamud.GameData.GetExcelSheet<Item>()!;
@@ -199,10 +201,12 @@ namespace Peon
             {
                 case "test":
                 {
-                    var uiModule = (UIModule*) Dalamud.GameGui.GetUIModule();
-                    var agents   = uiModule->GetAgentModule();
-                    var agent    = agents->GetAgentByInternalId(AgentId.ContentsTimer);
-                    Dalamud.Chat.Print($"0x{(ulong) agent:X}");
+                    var info  = Service<PositionInfoAddress>.Get();
+                    var house = info.House;
+                    if (house == 0)
+                        Dalamud.Chat.Print($"{info.Zone} Ward {info.Ward}, {info.Plot} {(info.Subdivision ? "(Subdivision)" : "")}");
+                    else
+                        Dalamud.Chat.Print($"{info.Zone} Ward {info.Ward}, {info.House} Floor {info.Floor}");
                     break;
                 }
                 case "sig":

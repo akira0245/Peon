@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Dalamud.Game;
 using Dalamud.Logging;
+using Dalamud.Memory;
 using Dalamud.Plugin;
 using Peon.Bothers;
 using Peon.Modules;
@@ -258,16 +259,15 @@ namespace Peon.Managers
             {
                 PluginLog.Verbose("Next YesNo clicked with {Value}", _selectNextYesNo.Value);
                 selectPtr.Click(_selectNextYesNo.Value);
+                _selectNextYesNo = null;
                 return;
             }
-
-            _selectNextYesNo = null;
 
             if (!Peon.Config.EnableNoBother)
                 return;
 
             var stringPtr = *(void**) ((byte*) updateData.ToPointer() + 0x8);
-            var text      = Marshal.PtrToStringAnsi(new IntPtr(stringPtr)) ?? string.Empty;
+            var text      = MemoryHelper.ReadStringNullTerminated(new IntPtr(stringPtr));
 
             var yesText = selectPtr.YesText;
             var noText  = selectPtr.NoText;

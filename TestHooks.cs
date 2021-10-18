@@ -3,6 +3,7 @@ using System.Reflection.Metadata.Ecma335;
 using System.Runtime.InteropServices;
 using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.System.Resource.Handle;
+using Peon.SeFunctions;
 using Peon.Utility;
 
 namespace Peon
@@ -13,7 +14,7 @@ namespace Peon
         private delegate void   Delegate3PtrInt(IntPtr a1, IntPtr a2, IntPtr a3, int a4);
         private delegate IntPtr Delegate2Ptr_Ptr(IntPtr a1, IntPtr a2);
         private delegate IntPtr Delegate2PtrInt_Ptr(IntPtr a1, IntPtr a2, uint a3);
-        private delegate void   DelegateReceiveEvent(IntPtr atkUnit, ushort eventType, int which, IntPtr source, IntPtr unused);
+        
         private delegate IntPtr Delegate4Ptr_Ptr(IntPtr a1, IntPtr a2, IntPtr a3, IntPtr a4);
         private delegate IntPtr DelegatePtr_Ptr(IntPtr a1);
         private delegate IntPtr DelegatePtrByte_Ptr(IntPtr a1, byte a2);
@@ -27,14 +28,14 @@ namespace Peon
             hooks.Create<Delegate2Ptr_Ptr>("ResourceUnload", 0x1B2E60, false, (Func<IntPtr, IntPtr, bool>) ResourceUnloadCondition);
             hooks.Create<Delegate2PtrInt_Ptr>("IncRef", 0x1A2500, false, (Func<IntPtr, IntPtr, uint, bool>) IncRefCondition);
             hooks.Create<Delegate2PtrInt_Ptr>("DecRef", 0x1A24D0, false, (Func<IntPtr, IntPtr, uint, bool>) IncRefCondition);
-            hooks.Create<DelegateReceiveEvent>("ReceiveYesNoEvent", 0xCF1220, false, null, ReceiveEventData);
-            hooks.Create<DelegateReceiveEvent>("ReceiveMainEvent",  0xFFBB20, false, null, ReceiveEventData);
+            hooks.Create<OnAddonReceiveEventDelegate>("ReceiveYesNoEvent", 0xCF1220, false, null, ReceiveEventData);
+            hooks.Create<OnAddonReceiveEventDelegate>("ReceiveMainEvent",  0xFFBB20, false, null, ReceiveEventData);
             hooks.Create<DelegatePtr_Ptr>("MaybeCleanResources", 0x1B4200, false);
-            hooks.Create<DelegateReceiveEvent>("ReceiveHousingBoardEvent",  0x1058B40, false, null, ReceiveEventData);
-            hooks.Create<DelegateReceiveEvent>("ReceiveRequestEvent",       0xd0a210,  false, null, ReceiveEventData);
-            hooks.Create<DelegateReceiveEvent>("ReceiveJournalResultEvent", 0xDF9000,  false, null, ReceiveEventData);
-            hooks.Create<DelegateReceiveEvent>("ReceiveFocusTargetEvent",   0x101e6b0,  false, (Func<IntPtr, ushort, int, IntPtr, IntPtr, bool>) EventDataCondition, ReceiveEventData);
-            hooks.Create<DelegateReceiveEvent>("ReceiveSelectStringEvent",   0xCDC310,  false, null, ReceiveEventData);
+            hooks.Create<OnAddonReceiveEventDelegate>("ReceiveHousingBoardEvent",  0x1058B40, false, null, ReceiveEventData);
+            hooks.Create<OnAddonReceiveEventDelegate>("ReceiveRequestEvent",       0xd0a210,  false, null, ReceiveEventData);
+            hooks.Create<OnAddonReceiveEventDelegate>("ReceiveJournalResultEvent", 0xDF9000,  false, null, ReceiveEventData);
+            hooks.Create<OnAddonReceiveEventDelegate>("ReceiveFocusTargetEvent",   0x101e6b0,  false, (Func<IntPtr, ushort, int, IntPtr, IntPtr, bool>) EventDataCondition, ReceiveEventData);
+            hooks.Create<OnAddonReceiveEventDelegate>("ReceiveSelectStringEvent",   0xCDC310,  false, null, ReceiveEventData);
             hooks.Create<DelegatePtrByte_Ptr>("Unk", 0x1a5770, false);
             hooks.Create<DelegatePtr>("Unk2", 0x1a5150, false);
             hooks.Create<Delegate3PtrInt>("Unk3", 0x1a23a0, false);
@@ -67,7 +68,7 @@ namespace Peon
         private static bool EventDataCondition(IntPtr ptr, ushort eventType, int which, IntPtr source, IntPtr value)
             => eventType == 3;
 
-        private static DelegateReceiveEvent ReceiveEventData = (_, _, _, data, eventInfo) =>
+        private static OnAddonReceiveEventDelegate ReceiveEventData = (_, _, _, data, eventInfo) =>
         {
             PluginLog.Information(
                 $"Helper: [0] = {*(ulong*) (data + 0):X}, [1] = {*(IntPtr*) (data + 8):X}, [2] = {*(IntPtr*) (data + 0x10):X}, [3] = {*(ulong*) (data + 0x18):X}, [4] = {*(ulong*) (data + 0x20):X}, [5] = {*(ulong*) (data + 0x28):X}, [6] = {*(IntPtr*) (data + 0x30):X}, [7] = {*(IntPtr*) (data + 0x38):X}");

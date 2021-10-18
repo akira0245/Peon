@@ -2,6 +2,7 @@
 using Dalamud.Configuration;
 using Peon.Bothers;
 using Peon.Crafting;
+using Peon.SeFunctions;
 using Peon.Utility;
 
 namespace Peon
@@ -18,8 +19,10 @@ namespace Peon
         public readonly List<SelectBotherSet>      BothersSelect            = new();
         public readonly List<AlternatingBotherSet> BothersAlternatingSelect = new();
         public readonly List<string>               CharacterNames           = new();
+        public readonly List<(ulong, string)>      HousingNames             = new();
 
         public readonly Dictionary<string, Macro> CraftingMacros = new();
+
 
         public void Save()
             => Dalamud.PluginInterface.SavePluginConfig(this);

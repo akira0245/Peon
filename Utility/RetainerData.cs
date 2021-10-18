@@ -93,7 +93,7 @@ namespace Peon.Utility
         }
 
         private static unsafe long ToGil(AtkTextNode* node)
-            => long.Parse(Module.TextNodeToString(node).Replace(",", ""));
+            => long.Parse(Module.TextNodeToString(node).Replace(",", "").Replace(".", "").Replace(" ", ""));
 
         private static unsafe byte ToDigit(AtkTextNode* node)
             => byte.Parse(Module.TextNodeToString(node));

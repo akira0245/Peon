@@ -9,6 +9,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
+using Lumina.Excel.GeneratedSheets;
+using Peon.SeFunctions;
 
 namespace Peon.Gui
 {
@@ -332,8 +334,10 @@ namespace Peon.Gui
             for (var idx = 0; idx < Peon.Config.BothersAlternatingSelect.Count; ++idx)
             {
                 var botherGroup = Peon.Config.BothersAlternatingSelect[idx];
-                if (!ImGui.BeginChild($"##AselectGroup{idx}", 
-                    Vector2.UnitY * (2 * (ImGui.GetStyle().FramePadding.Y + ImGui.GetStyle().ItemSpacing.Y) + ImGui.GetFrameHeightWithSpacing() * 2 * botherGroup.Bothers.Length), true))
+                if (!ImGui.BeginChild($"##AselectGroup{idx}",
+                    Vector2.UnitY
+                  * (2 * (ImGui.GetStyle().FramePadding.Y + ImGui.GetStyle().ItemSpacing.Y)
+                      + ImGui.GetFrameHeightWithSpacing() * 2 * botherGroup.Bothers.Length), true))
                 {
                     ImGui.EndChild();
                     continue;
@@ -378,6 +382,7 @@ namespace Peon.Gui
                            .Concat(botherGroup.Bothers.Skip(jdx + 1)).ToArray();
                         changes = true;
                     }
+
                     ImGui.Unindent();
 
                     if (changes)
@@ -393,7 +398,8 @@ namespace Peon.Gui
 
             if (DrawNewTextInput("##AselectNew", ref _newSelect))
             {
-                Peon.Config.BothersAlternatingSelect.Add(new AlternatingBotherSet(new SelectBotherSet(_newSelect, MatchType.Equal) { Source = SelectSource.Disabled }));
+                Peon.Config.BothersAlternatingSelect.Add(
+                    new AlternatingBotherSet(new SelectBotherSet(_newSelect, MatchType.Equal) { Source = SelectSource.Disabled }));
                 Save();
                 _newSelect = string.Empty;
             }
@@ -502,6 +508,147 @@ namespace Peon.Gui
             }
         }
 
+        private HousingZone _newHousingZone = HousingZone.Mist;
+        private ushort      _newWard        = 1;
+        private ushort      _newPlot        = 1;
+        private ushort      _newServerId    = 0;
+        private string      _newHouseName   = string.Empty;
+
+        private void DrawDeleteButton(int idx)
+        {
+            ImGui.PushFont(UiBuilder.IconFont);
+            if (ImGui.Button($"{FontAwesomeIcon.Trash.ToIconChar()}##Delete{idx}"))
+            {
+                Peon.Config.HousingNames.RemoveAt(idx);
+                Peon.Config.Save();
+            }
+            ImGui.PopFont();
+        }
+
+        private HousingZone DrawHousingZoneCombo(int idx, HousingZone zone)
+        {
+            ImGui.SetNextItemWidth(150);
+            if (ImGui.BeginCombo($"##houseNameZone{idx}", zone == HousingZone.Unknown ? "Zone" : zone.ToString()))
+            {
+                if (ImGui.Selectable($"{HousingZone.Mist.ToName()}##{idx}", zone == HousingZone.Mist))
+                    return HousingZone.Mist;
+                if (ImGui.Selectable($"{HousingZone.LavenderBeds.ToName()}##{idx}", zone == HousingZone.LavenderBeds))
+                    return HousingZone.LavenderBeds;
+                if (ImGui.Selectable($"{HousingZone.Goblet.ToName()}##{idx}", zone == HousingZone.Goblet))
+                    return HousingZone.Goblet;
+                if (ImGui.Selectable($"{HousingZone.Shirogane.ToName()}##{idx}", zone == HousingZone.Shirogane))
+                    return HousingZone.Shirogane;
+                if (ImGui.Selectable($"{HousingZone.Firmament.ToName()}##{idx}", zone == HousingZone.Firmament))
+                    return HousingZone.Firmament;
+
+                ImGui.EndCombo();
+            }
+
+            return zone;
+        }
+
+        private ushort DrawServerInput(int idx, ushort serverId)
+        {
+            ImGui.SetNextItemWidth(150);
+            var sheet = Dalamud.GameData.GetExcelSheet<World>()!;
+            if (serverId == 0 && Dalamud.ClientState.LocalPlayer != null)
+                serverId = (ushort) Dalamud.ClientState.LocalPlayer.CurrentWorld.Id;
+            var currentName = serverId == 0 ? "World" : sheet.GetRow(serverId)!.Name.RawString;
+            if (ImGui.BeginCombo($"##houseNameServer{idx}", currentName))
+            {
+                foreach (var world in sheet.Where(w => w.IsPublic))
+                {
+                    var name = world.Name.RawString;
+                    if (ImGui.Selectable(name, currentName == name))
+                        serverId = (ushort) world.RowId;
+                }
+
+                ImGui.EndCombo();
+            }
+
+            return serverId;
+        }
+
+        private ushort DrawHousingWardInput(int idx, ushort ward)
+        {
+            int tmp = ward;
+            ImGui.SetNextItemWidth(30);
+            if (ImGui.InputInt($"##Ward{idx}", ref tmp, 0) && tmp > 0 && tmp < 25)
+                return (ushort) tmp;
+
+            return ward;
+        }
+
+        private ushort DrawHousingPlotInput(int idx, ushort plot)
+        {
+            int tmp = plot;
+            ImGui.SetNextItemWidth(30);
+            if (ImGui.InputInt($"##Plot{idx}", ref tmp, 0) && tmp > 0 && tmp < 61)
+                return (ushort) tmp;
+
+            return plot;
+        }
+
+        private bool DrawHousingNameInput(int idx, string oldName, out string name)
+        {
+            name = oldName;
+            ImGui.SetNextItemWidth(-1);
+            return ImGui.InputText($"##houseName{idx}", ref name, 32, ImGuiInputTextFlags.EnterReturnsTrue);
+        }
+
+        private void DrawHouseNameConfig()
+        {
+            using ImGuiRaii imgui = new();
+            if (!imgui.Begin(() => ImGui.BeginTabItem("House Names"), ImGui.EndTabItem))
+                return;
+
+            for (var i = 0; i < Peon.Config.HousingNames.Count; ++i)
+            {
+                DrawDeleteButton(i);
+                if (i >= Peon.Config.HousingNames.Count)
+                    break;
+                ImGui.SameLine();
+                var house = Peon.Config.HousingNames[i];
+                var zone  = DrawHousingZoneCombo(i, (HousingZone) ((house.Item1 >> 32) & 0xFFFF));
+                ImGui.SameLine();
+                var server = DrawServerInput(i, (ushort) ((house.Item1 >> 48) & 0xFFFF));
+                ImGui.SameLine();
+                var ward = DrawHousingWardInput(i, (ushort) ((house.Item1 >> 16) & 0xFFFF));
+                ImGui.SameLine();
+                var plot = DrawHousingPlotInput(i, (ushort) (house.Item1 & 0xFFFF));
+                ImGui.SameLine();
+                var nameChange = DrawHousingNameInput(i, house.Item2, out var name);
+                var key        = plot | ((ulong) ward << 16) | ((ulong) zone << 32) | ((ulong) server << 48);
+                if (key != house.Item1)
+                {
+                    Peon.Config.HousingNames.RemoveAt(i--);
+                    Peon.Config.HousingNames.Add((key, house.Item2));
+                    Peon.Config.Save();
+                }
+                else if (nameChange && name != house.Item2)
+                {
+                    Peon.Config.HousingNames.Add((key, name));
+                    Peon.Config.Save();
+                }
+            }
+
+            _newHousingZone = DrawHousingZoneCombo(Peon.Config.HousingNames.Count, _newHousingZone);
+            ImGui.SameLine();
+            _newServerId = DrawServerInput(Peon.Config.HousingNames.Count, _newServerId);
+            ImGui.SameLine();
+            _newWard = DrawHousingWardInput(Peon.Config.HousingNames.Count, _newWard);
+            ImGui.SameLine();
+            _newPlot = DrawHousingPlotInput(Peon.Config.HousingNames.Count, _newPlot);
+            ImGui.SameLine();
+            if (DrawHousingNameInput(Peon.Config.HousingNames.Count, _newHouseName, out _newHouseName) && _newHouseName.Any())
+            {
+                var key = _newPlot | ((ulong)_newWard << 16) | ((ulong)_newHousingZone << 32) | ((ulong)_newServerId << 48);
+                Peon.Config.HousingNames.Add((key, _newHouseName));
+                Peon.Config.Save();
+                _newHouseName = string.Empty;
+            }
+        }
+
         private void DrawPeonConfig()
         {
             using ImGuiRaii imgui = new();
@@ -543,10 +690,9 @@ namespace Peon.Gui
 
             if (ImGui.CollapsingHeader("Interface Waitlist"))
             {
-
-                if ((_peon.InterfaceManager.GetType().BaseType?
+                if (_peon.InterfaceManager.GetType().BaseType?
                    .GetField("_waitList", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy)?
-                   .GetValue(_peon.InterfaceManager) is LinkedList<TimeOutList<IntPtr, ModuleInfo>.WaitBlock> waitList))
+                   .GetValue(_peon.InterfaceManager) is LinkedList<TimeOutList<IntPtr, ModuleInfo>.WaitBlock> waitList)
                 {
                     var i = 0;
                     foreach (var waitBlock in waitList)
@@ -577,8 +723,14 @@ namespace Peon.Gui
                     ImGui.Text("Trying to select next string.");
             }
 
-            if (ImGui.CollapsingHeader("Strings"))
+            if (ImGui.CollapsingHeader("Plant Timers"))
             {
+                ImGui.Text($"Last Plant: {_peon.TimerManager.LastPlant}");
+                ImGui.Text($"Last Patch: {_peon.TimerManager.LastPatch}");
+                ImGui.Text($"Last Bed: {_peon.TimerManager.LastBed}");
+            }
+
+            if (ImGui.CollapsingHeader("Strings"))
                 if (ImGui.BeginTable("##stringDebugTable", 2, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg))
                 {
                     foreach (StringId id in Enum.GetValues(typeof(StringId)))
@@ -592,7 +744,6 @@ namespace Peon.Gui
 
                     ImGui.EndTable();
                 }
-            }
         }
 
         private void Draw()
@@ -623,6 +774,7 @@ namespace Peon.Gui
                 DrawAlternatingBothers();
                 DrawMacros();
                 DrawLoginButtonConfig();
+                DrawHouseNameConfig();
                 DrawDebug();
             }
             finally

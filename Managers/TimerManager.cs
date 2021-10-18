@@ -5,7 +5,9 @@ using System.Runtime.InteropServices;
 using Dalamud.Game.Network;
 using Dalamud.Logging;
 using Dalamud.Memory;
+using Peon.Crops;
 using Peon.SeFunctions;
+using Peon.Utility;
 
 namespace Peon.Managers
 {
@@ -93,10 +95,11 @@ namespace Peon.Managers
         }
     }
 
-    public unsafe class TimerManager : IDisposable
+    public unsafe partial class TimerManager : IDisposable
     {
         private readonly InterfaceManager   _interface;
         private readonly PeonTimers         _timers;
+        private readonly AddonWatcher       _watcher;
         private readonly RetainerContainer* _retainers;
         private          Retainer*          _retainerList;
 
@@ -105,11 +108,13 @@ namespace Peon.Managers
         public readonly ushort SubmarineTimerOpCode;
         public readonly ushort SubmarineStatusOpCode;
 
-        public TimerManager(InterfaceManager i)
+        public TimerManager(InterfaceManager i, AddonWatcher watcher)
         {
-            _interface = i;
-            _timers    = Peon.Timers;
-            _retainers = (RetainerContainer*) new StaticRetainerContainer(Dalamud.SigScanner).Address;
+            _interface            = i;
+            _watcher              = watcher;
+            _timers               = Peon.Timers;
+            _retainers            = (RetainerContainer*) new StaticRetainerContainer(Dalamud.SigScanner).Address;
+            _position             = Service<PositionInfoAddress>.Get();
 
             AirshipTimerOpCode    = 0x0166; // Dalamud.GameData.ServerOpCodes["AirshipTimers"]
             AirshipStatusOpCode   = 0x02FE; // Dalamud.GameData.ServerOpCodes["AirshipStatusList"]
@@ -117,7 +122,10 @@ namespace Peon.Managers
             SubmarineStatusOpCode = 0x01EF; // Dalamud.GameData.ServerOpCodes["SubmarineStatusList"]
 
             if (Peon.Config.EnableTimers)
+            {
                 SetMessage();
+                SetupPlants();
+            }
         }
 
         public void SetMessage()
@@ -126,9 +134,9 @@ namespace Peon.Managers
         public void RemoveMessage()
             => Dalamud.Network.NetworkMessage -= NetworkMessage;
 
-        private bool UpdateRetainer()
+        public bool UpdateRetainers()
         {
-            if (_retainers == null || _retainers->Ready != 1)
+            if (Dalamud.ClientState.LocalPlayer == null || _retainers == null || _retainers->Ready != 1)
                 return false;
 
             _retainerList = (Retainer*) _retainers->Retainers;
@@ -148,31 +156,6 @@ namespace Peon.Managers
             return changes;
         }
 
-        private bool UpdateMachines()
-        {
-            var selectString = _interface.SelectString();
-            if (!selectString || !InterfaceManager.IsReady(&selectString.Pointer->AtkUnitBase))
-                return false;
-
-            var desc = selectString.Description();
-            if (!(desc.EndsWith("Select an airship.") || desc.EndsWith("Select a submersible.")))
-                return false;
-
-            var fcName = $"{Dalamud.ClientState.LocalPlayer!.CompanyTag} ({Dalamud.ClientState.LocalPlayer.HomeWorld.GameData.Name})";
-            return false;
-        }
-
-        public void Update(bool retainer, bool machines)
-        {
-            if (Dalamud.ClientState.LocalPlayer == null)
-                return;
-
-            var saveConfig = retainer && UpdateRetainer();
-            saveConfig |= machines && UpdateMachines();
-            if (saveConfig)
-                _timers.Save();
-        }
-
         public void NetworkMessage(IntPtr data, ushort opCode, uint sourceId, uint targetId, NetworkMessageDirection direction)
         {
             string? fcName = null;
@@ -188,7 +171,7 @@ namespace Peon.Managers
 
                     fcName ??= $"{Dalamud.ClientState.LocalPlayer!.CompanyTag} ({Dalamud.ClientState.LocalPlayer.HomeWorld.GameData.Name})";
                     var time = timer[i].TimeStamp == 0 ? DateTime.UnixEpoch : new DateTime((timer[i].TimeStamp + 62135596800) * TimeSpan.TicksPerSecond, DateTimeKind.Utc);
-                    changes |= _timers.AddOrUpdateMachine(fcName, timer[i].Name, time, PeonTimers.MachineType.Submarine);
+                    changes |= _timers.AddOrUpdateMachine(fcName, timer[i].Name, time, MachineType.Submarine);
                 }
             }
             else if (opCode == AirshipTimerOpCode)
@@ -201,7 +184,7 @@ namespace Peon.Managers
 
                     fcName ??= $"{Dalamud.ClientState.LocalPlayer!.CompanyTag} ({Dalamud.ClientState.LocalPlayer.HomeWorld.GameData.Name})";
                     var time = timer[i].TimeStamp == 0 ? DateTime.UnixEpoch : new DateTime((timer[i].TimeStamp + 62135596800) * TimeSpan.TicksPerSecond, DateTimeKind.Utc);
-                    changes |= _timers.AddOrUpdateMachine(fcName, timer[i].Name, time, PeonTimers.MachineType.Airship);
+                    changes |= _timers.AddOrUpdateMachine(fcName, timer[i].Name, time, MachineType.Airship);
                 }
             }
             else if (opCode == SubmarineStatusOpCode)
@@ -214,7 +197,7 @@ namespace Peon.Managers
 
                     fcName ??= $"{Dalamud.ClientState.LocalPlayer!.CompanyTag} ({Dalamud.ClientState.LocalPlayer.HomeWorld.GameData.Name})";
                     var time = timer[i].TimeStamp == 0 ? DateTime.UnixEpoch : new DateTime((timer[i].TimeStamp + 62135596800) * TimeSpan.TicksPerSecond, DateTimeKind.Utc);
-                    changes |= _timers.AddOrUpdateMachine(fcName, timer[i].Name, time, PeonTimers.MachineType.Submarine);
+                    changes |= _timers.AddOrUpdateMachine(fcName, timer[i].Name, time, MachineType.Submarine);
                 }
             }
             else if (opCode == AirshipStatusOpCode)
@@ -227,17 +210,18 @@ namespace Peon.Managers
 
                     fcName ??= $"{Dalamud.ClientState.LocalPlayer!.CompanyTag} ({Dalamud.ClientState.LocalPlayer.HomeWorld.GameData.Name})";
                     var time = timer[i].TimeStamp == 0 ? DateTime.UnixEpoch : new DateTime((timer[i].TimeStamp + 62135596800) * TimeSpan.TicksPerSecond, DateTimeKind.Utc);
-                    changes |= _timers.AddOrUpdateMachine(fcName, timer[i].Name, time, PeonTimers.MachineType.Airship);
+                    changes |= _timers.AddOrUpdateMachine(fcName, timer[i].Name, time, MachineType.Airship);
                 }
             }
 
             if (changes)
-                _timers.Save();
+                _timers.SaveMachines();
         }
 
         public void Dispose()
         {
             Dalamud.Network.NetworkMessage -= NetworkMessage;
+            DisposePlants();
         }
     }
 }
