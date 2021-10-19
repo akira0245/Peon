@@ -230,11 +230,11 @@ namespace Peon.Utility
             Set(StringId.RemoveCrop,     sheet.GetRow(5)!.String.RawString);
             Set(StringId.HarvestCrop,    sheet.GetRow(6)!.String.RawString);
             Set(StringId.PlantCrop,      sheet.GetRow(2)!.String.RawString);
-            Set(StringId.DisposeCrop,    sheet.GetRow(11)!.String.RawString);
+            Set(StringId.DisposeCrop,    sheet.GetRow(11)!.String.Payloads[0].RawString);
             Set(StringId.CropBeyondHope, GetCorrectPayload(sheet.GetRow(7)!.String,  -1, -1, -1, 0));
             Set(StringId.CropDoingWell,  GetCorrectPayload(sheet.GetRow(8)!.String,  -1, -1, -1, 0));
             Set(StringId.CropBetterDays, GetCorrectPayload(sheet.GetRow(9)!.String,  -1, -1, -1, 0));
-            Set(StringId.CropReady,      GetCorrectPayload(sheet.GetRow(10)!.String, -1, -1, -1, 0));
+            Set(StringId.CropReady,      GetCorrectPayload(sheet.GetRow(10)!.String, -1, -3, -1, 0));
             Set(StringId.CropPrepareBed, GetCorrectPayload(addon.GetRow(6413)!.Text, 0,  0,  -1, -1));
             Set(StringId.Mist,           names.GetRow(territories.GetRow((uint) HousingZones.Mist)!.PlaceName.Row)!.Name.RawString);
             Set(StringId.LavenderBeds,   names.GetRow(territories.GetRow((uint) HousingZones.LavenderBeds)!.PlaceName.Row)!.Name.RawString);

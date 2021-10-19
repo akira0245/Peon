@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Net.Mime;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Dalamud;
 using Dalamud.Game.Text.SeStringHandling;
@@ -73,10 +75,22 @@ namespace Peon.Managers
             _selectStringHook?.Dispose();
         }
 
-        private static SeString ParseText(PtrTalk talk)
+        private static string ParseText(PtrTalk talk)
         {
             var nodeText = talk.Pointer->AtkTextNode228->NodeText;
-            return SeString.Parse(nodeText.StringPtr, (int) nodeText.BufUsed - 1);
+            var seString = SeString.Parse(nodeText.StringPtr, (int) nodeText.BufUsed - 1);
+            if (seString.Payloads.Count < 4)
+                return string.Empty;
+
+            var payload = Dalamud.ClientState.ClientLanguage switch
+            {
+                ClientLanguage.German   => seString.Payloads[3],
+                ClientLanguage.French   => seString.Payloads[3],
+                ClientLanguage.Japanese => seString.Payloads[2],
+                _                       => seString.Payloads[2],
+            };
+
+            return (payload as TextPayload)?.Text ?? string.Empty;
         }
 
         public void CheckPlant(IntPtr talkPtr, IntPtr _)
@@ -85,10 +99,7 @@ namespace Peon.Managers
             var text = talk.Text();
             if (text.Contains(StringId.CropDoingWell.Value())
              || text.Contains(StringId.CropBetterDays.Value()))
-            {
-                var seString = ParseText(talk);
-                LastPlant = seString.Payloads.Count > 2 ? (seString.Payloads[2] as TextPayload)?.Text ?? string.Empty : string.Empty;
-            }
+                LastPlant = ParseText(talk);
         }
 
         private void SetPatch(PtrSelectString ptr)
@@ -97,7 +108,7 @@ namespace Peon.Managers
             var (bed, patch) = Dalamud.ClientState.ClientLanguage switch
             {
                 ClientLanguage.German   => text.Length == 16 ? (text[5] - '1', text[15] - '1') : (9, 9),
-                ClientLanguage.French   => text.Length == 24 ? (text[8] - '1', text[23] - '1') : (9, 9),
+                ClientLanguage.French   => text.Length == 24 ? (text[23] - '1', text[8] - '1') : (9, 9),
                 ClientLanguage.Japanese => text.Length == 5 ? (text[1] - '1', text[4] - '1') : (9, 9),
                 _                       => text.Length == 18 ? (text[0] - '1', text[9] - '1') : (9, 9),
             };
@@ -119,6 +130,35 @@ namespace Peon.Managers
         private static readonly Regex PlantingTextDe = new(@"(?<soil>.*?) verteilen und (?<seeds>.*?) aussäen\?", RegexOptions.Compiled);
         private static readonly Regex PlantingTextJp = new(@"(?<soil>.*?)に(?<seeds>.*?)を植えます。よろしいですか？", RegexOptions.Compiled);
 
+        private string CleanString(string s)
+        {
+            switch (Dalamud.ClientState.ClientLanguage)
+            {
+                case ClientLanguage.French:
+                    if (s.StartsWith("un "))
+                        return s.Substring(3);
+                    if (s.StartsWith("une "))
+                        return s.Substring(4);
+
+                    return s;
+                case ClientLanguage.German:
+                    if (s.StartsWith("einer "))
+                        return s.Substring(6);
+                    if (s.StartsWith("einem "))
+                        return s.Substring(6);
+
+                    return s;
+                case ClientLanguage.Japanese: return s;
+                default:
+                    if (s.StartsWith("a "))
+                        return s.Substring(2);
+                    if (s.StartsWith("an "))
+                        return s.Substring(3);
+
+                    return s;
+            }
+        }
+
         private CropData GetCropData(string text)
         {
             var match = Dalamud.ClientState.ClientLanguage switch
@@ -131,7 +171,7 @@ namespace Peon.Managers
             if (!match.Success)
                 return Crops.Crops.Find(0).Data;
 
-            return Crops.Crops.Find(match.Groups["seeds"].Value.Replace("a ", "").Replace("an ", ""));
+            return Crops.Crops.Find(CleanString(match.Groups["seeds"].Value));
         }
 
         public void SelectYesnoEventDetour(IntPtr atkUnit, ushort eventType, int which, IntPtr source, IntPtr data)
@@ -144,8 +184,8 @@ namespace Peon.Managers
                 {
                     var seString = SeString.Parse(node->NodeText.StringPtr, (int) node->NodeText.BufUsed - 1);
                     seString.Payloads.RemoveAll(p => p is NewLinePayload);
-                    var text = seString.ToString();
-                    if (text == StringId.DisposeCrop.Value())
+                    var text = seString.TextValue;
+                    if (text.StartsWith(StringId.DisposeCrop.Value()))
                     {
                         var id = IdentifyCropSpot();
                         if (id.Type != CropSpotType.Invalid)

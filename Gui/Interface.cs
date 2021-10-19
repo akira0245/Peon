@@ -528,7 +528,7 @@ namespace Peon.Gui
         private HousingZone DrawHousingZoneCombo(int idx, HousingZone zone)
         {
             ImGui.SetNextItemWidth(150);
-            if (ImGui.BeginCombo($"##houseNameZone{idx}", zone == HousingZone.Unknown ? "Zone" : zone.ToString()))
+            if (ImGui.BeginCombo($"##houseNameZone{idx}", zone == HousingZone.Unknown ? "Zone" : zone.ToName()))
             {
                 if (ImGui.Selectable($"{HousingZone.Mist.ToName()}##{idx}", zone == HousingZone.Mist))
                     return HousingZone.Mist;

@@ -291,13 +291,15 @@ namespace Peon.Gui
                 {
                     ImGui.PushStyleColor(ImGuiCol.Text, crop.Color);
                     var tree = ImGui.TreeNodeEx(crop.Name);
-                    if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                    if (ImGui.IsItemClicked(ImGuiMouseButton.Right) && ImGui.GetIO().KeyCtrl)
                     {
                         if (crop.Plot != null)
                             removePlot = crop.Plot;
                         else
                             removePerson = crop.Private;
                     }
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip("Hold Ctrl and Right-Click to clear.");
 
                     ImGui.SameLine(_widthTotal - _widthShortTime - 2 * ImGui.GetStyle().ItemSpacing.X - ImGui.GetStyle().ScrollbarSize);
                     ImGui.Text(CropInfo.Text(crop.Color, crop.TimeToFinish, crop.TimeToWilt, crop.TimeToWither));

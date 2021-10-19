@@ -123,8 +123,8 @@ namespace Peon.Crops
                 _nameToData = new Dictionary<string, CropData>(Data.Length * 2);
                 foreach (var data in Data)
                 {
-                    var itemName = sheet.GetRow(data.ItemId)!.Name.ToString();
-                    var seedName = sheet.GetRow(data.SeedId)!.Singular.ToString();
+                    var itemName = sheet.GetRow(data.ItemId)!.Singular.ToString().ToLowerInvariant();
+                    var seedName = sheet.GetRow(data.SeedId)!.Singular.ToString().ToLowerInvariant();
                     _nameToData[itemName] = data;
                     _nameToData[seedName] = data;
                 }
@@ -137,10 +137,13 @@ namespace Peon.Crops
         {
             if (_idToData == null)
             {
-                var nameData = GetNameData();
+                var sheet    = Dalamud.GameData.GetExcelSheet<Item>()!;
                 _idToData = new Dictionary<uint, (CropData, string)>(Data.Length);
-                foreach (var (name, data) in nameData)
-                    _idToData.TryAdd(data.ItemId, (data, name));
+                foreach (var data in Data)
+                {
+                    var itemName = sheet.GetRow(data.ItemId)!.Name.ToString();
+                    _idToData.TryAdd(data.ItemId, (data, itemName));
+                }
             }
 
             return _idToData;
@@ -150,6 +153,6 @@ namespace Peon.Crops
             => GetIdData().TryGetValue(itemId, out var crop) ? crop : (Data[0], string.Empty);
 
         public static CropData Find(string name)
-            => GetNameData().TryGetValue(name, out var crop) ? crop : Data[0];
+            => GetNameData().TryGetValue(name.ToLowerInvariant(), out var crop) ? crop : Data[0];
     }
 }

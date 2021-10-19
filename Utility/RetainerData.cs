@@ -75,7 +75,7 @@ namespace Peon.Utility
                 return 0;
 
             text = text.Substring(idx, 2).TrimEnd();
-            return byte.Parse(text);
+            return byte.TryParse(text, out var b) ? b : (byte) 0;
         }
 
         private static unsafe RetainerCity ToLocation(AtkImageNode* node)
@@ -93,13 +93,13 @@ namespace Peon.Utility
         }
 
         private static unsafe long ToGil(AtkTextNode* node)
-            => long.Parse(Module.TextNodeToString(node).Replace(",", "").Replace(".", "").Replace(" ", ""));
+            => long.TryParse(Module.TextNodeToString(node).Replace(",", "").Replace(".", "").Replace(" ", ""), out var l) ? l : 0L;
 
         private static unsafe byte ToDigit(AtkTextNode* node)
-            => byte.Parse(Module.TextNodeToString(node));
+            => byte.TryParse(Module.TextNodeToString(node), out var b) ? b : (byte) 0;
 
         private static unsafe RetainerJob ToJob(AtkImageNode* node)
-            => byte.Parse(Module.ImageNodeToTexture(node).Substring(19, 2)) switch
+            => (byte.TryParse(Module.ImageNodeToTexture(node).Substring(19, 2), out var b) ? b : 0) switch
             {
                 16 => RetainerJob.Miner,
                 17 => RetainerJob.Botanist,
