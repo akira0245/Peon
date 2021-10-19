@@ -58,18 +58,21 @@ namespace Peon.Gui
             {
                 var info = new StateInfo(_now, machines.Select(m => m.Value.Item1), true);
                 _allMachines = StateInfo.Combine(_allMachines, info);
-                var collapse = ColorHeader(fc, info);
-                if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-                    removeFc = fc;
-                if (!collapse)
-                    continue;
+                if (_drawStuff)
+                {
+                    var collapse = ColorHeader(fc, info);
+                    if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                        removeFc = fc;
+                    if (!collapse)
+                        continue;
 
-                using var table = SetupTable($"##Machines_{fc}", _widthTime + 15);
-                if (!table)
-                    continue;
+                    using var table = SetupTable($"##Machines_{fc}", _widthTime + 15);
+                    if (!table)
+                        continue;
 
-                foreach (var (name, (time, type)) in machines)
-                    DrawMachineRow(name, time, type);
+                    foreach (var (name, (time, type)) in machines)
+                        DrawMachineRow(name, time, type);
+                }
             }
 
             if (removeFc != null && Peon.Timers.Machines.Remove(removeFc))

@@ -50,6 +50,8 @@ namespace Peon.Gui
             DisposeIcons();
         }
 
+        private bool   _drawStuff    = true;
+        private string _headerString = "Peon Timers###Peon Timers";
 
         private void Draw()
         {
@@ -61,25 +63,28 @@ namespace Peon.Gui
             var minSize = new Vector2(_widthTotal * ImGuiHelpers.GlobalScale, ImGui.GetTextLineHeightWithSpacing() * 5);
             var maxSize = new Vector2(minSize.X,                              100000);
             ImGui.SetNextWindowSizeConstraints(minSize, maxSize);
-            if (!ImGui.Begin("Peon Timers"))
+
+            if (!_drawStuff)
             {
-                ImGui.End();
-                return;
+                using var colors = new ImGuiRaii()
+                   .PushColor(ImGuiCol.TitleBgCollapsed, TextToHeader(_cropColor))
+                   .PushStyle(ImGuiStyleVar.WindowBorderSize, 1)
+                   .PushColor(ImGuiCol.Border, 0xFFFFFFFF);
+                _drawStuff = ImGui.Begin(_headerString);
+            }
+            else
+            {
+                _drawStuff = ImGui.Begin(_headerString);
             }
 
             try
             {
-                var startPos = ImGui.GetCursorPos();
-                ImGui.NewLine();
-                ImGui.Separator();
-
                 DrawCrops();
                 DrawRetainers();
                 DrawMachines();
 
-                ImGui.SetCursorPos(startPos);
-                ImGui.Text(
-                    $"Retainers: {_allRetainers.FinishedObjects}|{_allRetainers.SentObjects}|{_allRetainers.AvailableObjects}, Machines: {_allMachines.FinishedObjects}|{_allMachines.SentObjects}|{_allMachines.AvailableObjects}");
+                _headerString =
+                    $"Retainers: {_allRetainers.FinishedObjects} | {_allRetainers.SentObjects} | {_allRetainers.AvailableObjects},     Machines: {_allMachines.FinishedObjects} | {_allMachines.SentObjects} | {_allMachines.AvailableObjects}###Peon Timers";
             }
             finally
             {

@@ -284,7 +284,7 @@ namespace Peon.Gui
             GatherCropInfo();
             PlotCrops?    removePlot   = null;
             PrivateCrops? removePerson = null;
-            if (CropHeader())
+            if (_drawStuff && CropHeader())
             {
                 SortCrops();
                 foreach (var crop in _cropInfo)

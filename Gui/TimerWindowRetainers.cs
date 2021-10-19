@@ -33,26 +33,28 @@ namespace Peon.Gui
         {
             var save = UpdateRetainers();
             _allRetainers = StateInfo.Empty;
-
             string? removePlayer = null;
             foreach (var (player, retainers) in Peon.Timers.Retainers)
             {
                 var playerInfo = new StateInfo(_now, retainers.Values, false);
                 _allRetainers = StateInfo.Combine(_allRetainers, playerInfo);
-                var collapse = ColorHeader(player, playerInfo);
+                if (_drawStuff)
+                {
+                    var collapse = ColorHeader(player, playerInfo);
 
-                if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-                    removePlayer = player;
+                    if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                        removePlayer = player;
 
-                if (!collapse)
-                    continue;
+                    if (!collapse)
+                        continue;
 
-                using var table = SetupTable($"##Retainers_{player}", _widthTime + 15);
-                if (!table)
-                    continue;
+                    using var table = SetupTable($"##Retainers_{player}", _widthTime + 15);
+                    if (!table)
+                        continue;
 
-                foreach (var (retainer, time) in retainers)
-                    DrawRetainerRow(retainer, time);
+                    foreach (var (retainer, time) in retainers)
+                        DrawRetainerRow(retainer, time);
+                }
             }
 
             save |= removePlayer != null && Peon.Timers.Retainers.Remove(removePlayer);
