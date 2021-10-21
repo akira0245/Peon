@@ -123,10 +123,15 @@ namespace Peon.Crops
                 _nameToData = new Dictionary<string, CropData>(Data.Length * 2);
                 foreach (var data in Data)
                 {
-                    var itemName = sheet.GetRow(data.ItemId)!.Singular.ToString().ToLowerInvariant();
-                    var seedName = sheet.GetRow(data.SeedId)!.Singular.ToString().ToLowerInvariant();
+                    
+                    var itemName         = sheet.GetRow(data.ItemId)!.Name.ToString().ToLowerInvariant();
+                    var seedName         = sheet.GetRow(data.SeedId)!.Name.ToString().ToLowerInvariant();
+                    var itemNameSingular = sheet.GetRow(data.ItemId)!.Singular.ToString().ToLowerInvariant();
+                    var seedNameSingular = sheet.GetRow(data.SeedId)!.Singular.ToString().ToLowerInvariant();
                     _nameToData[itemName] = data;
                     _nameToData[seedName] = data;
+                    _nameToData[seedNameSingular] = data;
+                    _nameToData[itemNameSingular] = data;
                 }
             }
 

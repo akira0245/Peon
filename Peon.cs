@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -19,6 +20,7 @@ using Peon.Modules;
 using Peon.SeFunctions;
 using Peon.Utility;
 using CommandManager = Peon.Managers.CommandManager;
+using MatchType = Peon.Bothers.MatchType;
 using Module = Peon.Modules.Module;
 
 namespace Peon
@@ -561,6 +563,12 @@ namespace Peon
                     break;
                 case "buyplotkill":
                     Board.StartBuying(100, 150, true, true);
+                    break;
+                case "exportquests":
+                    if (argumentParts.Length > 1)
+                        new QuestManager().Export(new FileInfo(argumentParts[1]), true);
+                    else
+                        Dalamud.Chat.PrintError("Please enter filename for export.");
                     break;
             }
         }

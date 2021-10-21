@@ -82,7 +82,7 @@ namespace Peon.Gui
 
             ImGui.BeginGroup();
             var collapse = ImGui.CollapsingHeader(header);
-            ImGui.SameLine(_widthTotal - _widthShortTime - 2 * ImGui.GetStyle().ItemSpacing.X - ImGui.GetStyle().ScrollbarSize);
+            ImGui.SameLine((_widthTotal - _widthShortTime) * ImGuiHelpers.GlobalScale - 2 * ImGui.GetStyle().ItemSpacing.X - ImGui.GetStyle().ScrollbarSize);
             ImGui.Text(text);
             ImGui.EndGroup();
             ImGui.PopStyleColor();

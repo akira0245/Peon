@@ -2,7 +2,6 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Logging;
-using Dalamud.Plugin;
 
 namespace Peon.Managers
 {

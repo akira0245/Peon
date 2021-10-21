@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dalamud.Interface;
 using ImGuiNET;
 using Peon.Crops;
 
@@ -229,7 +230,7 @@ namespace Peon.Gui
 
             ImGui.BeginGroup();
             var collapse = ImGui.CollapsingHeader("Crops");
-            ImGui.SameLine(_widthTotal - _widthShortTime - 2 * ImGui.GetStyle().ItemSpacing.X - ImGui.GetStyle().ScrollbarSize);
+            ImGui.SameLine((_widthTotal - _widthShortTime) * ImGuiHelpers.GlobalScale - 2 * ImGui.GetStyle().ItemSpacing.X - ImGui.GetStyle().ScrollbarSize);
             ImGui.Text(text);
             ImGui.EndGroup();
             ImGui.PopStyleColor();
@@ -301,7 +302,7 @@ namespace Peon.Gui
                     if (ImGui.IsItemHovered())
                         ImGui.SetTooltip("Hold Ctrl and Right-Click to clear.");
 
-                    ImGui.SameLine(_widthTotal - _widthShortTime - 2 * ImGui.GetStyle().ItemSpacing.X - ImGui.GetStyle().ScrollbarSize);
+                    ImGui.SameLine((_widthTotal - _widthShortTime) * ImGuiHelpers.GlobalScale - 2 * ImGui.GetStyle().ItemSpacing.X - ImGui.GetStyle().ScrollbarSize);
                     ImGui.Text(CropInfo.Text(crop.Color, crop.TimeToFinish, crop.TimeToWilt, crop.TimeToWither));
                     ImGui.PopStyleColor();
                     if (tree)
